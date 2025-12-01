@@ -1,0 +1,1 @@
+jira completion fish | source

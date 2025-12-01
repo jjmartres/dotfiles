@@ -1,0 +1,4 @@
+gui:
+  language: auto
+  timeFormat: 02 Jan 06
+  shortTimeFormat: 15:04:24

@@ -1,0 +1,108 @@
+function update --description "Update Neovim plugins, Homebrew packages, and system"
+    set -l dotfiles_path "$HOME/Repositories/perso/dotfiles"
+
+    # Color codes for better readability
+    set -l green (set_color green)
+    set -l blue (set_color blue)
+    set -l yellow (set_color yellow)
+    set -l red (set_color red)
+    set -l normal (set_color normal)
+
+    # Check if 'os' argument is passed
+    if test "$argv[1]" = os
+        echo $blue"═══════════════════════════════════════"$normal
+        echo $blue"  Installing OS Updates and Restarting"$normal
+        echo $blue"═══════════════════════════════════════"$normal
+        echo
+        echo $yellow"➤ Installing macOS updates..."$normal
+        echo $red"⚠ System will restart after installation!"$normal
+        sudo softwareupdate --install --os-only --restart
+        return
+    end
+
+    echo $blue"═══════════════════════════════════════"$normal
+    echo $blue"  Starting System Update"$normal
+    echo $blue"═══════════════════════════════════════"$normal
+    echo
+
+    # Update Neovim plugins
+    echo $yellow"➤ Updating Neovim plugins..."$normal
+    if nvim --headless "+Lazy! sync" +qa
+        echo $green"✓ Neovim plugins updated"$normal
+    else
+        echo $red"✗ Neovim update failed"$normal
+    end
+
+    echo $yellow"➤ Updating Mason packages..."$normal
+    if nvim --headless "+Mason" +qa
+        echo $green"✓ Mason packages updated"$normal
+    else
+        echo $red"✗ Mason update failed"$normal
+    end
+    echo
+
+    # Update Command Line Tools
+    echo $yellow"➤ Checking Command Line Tools..."$normal
+    if softwareupdate --list | grep -q "Command Line Tools"
+        sudo softwareupdate --install "Command Line Tools for Xcode"
+        and echo $green"✓ Command Line Tools updated"$normal
+        or echo $red"✗ Command Line Tools update failed"$normal
+    else
+        echo $green"✓ Command Line Tools already up to date"$normal
+    end
+    echo
+
+    # Update asdf plugins
+    echo $yellow"➤ Updating asdf plugins..."$normal
+    if asdf plugin update --all
+        echo $green"✓ Asdf plugins updated"$normal
+    else
+        echo $red"✗ Asdf plugins update failed"$normal
+    end
+    echo
+
+    # Update Homebrew
+    echo $yellow"➤ Updating Homebrew packages..."$normal
+
+    # Run brew bundle if Brewfile exists
+    if test -f "$dotfiles_path/Brewfile"
+        pushd "$dotfiles_path"
+        and brew bundle
+        or begin
+            echo $red"✗ Brew bundle failed"$normal
+        end
+    else
+        echo $yellow"⚠ Brewfile not found at $dotfiles_path"$normal
+    end
+
+    brew update
+    and echo $green"✓ Brew updated"$normal
+    or echo $red"✗ Brew update failed"$normal
+
+    brew upgrade
+    and echo $green"✓ Packages upgraded"$normal
+    or echo $red"✗ Package upgrade failed"$normal
+
+    # Check if brew-cask-upgrade is installed
+    if brew tap | grep -q buo/cask-upgrade
+        brew cu --all --yes --cleanup
+        and echo $green"✓ Casks upgraded"$normal
+        or echo $red"✗ Cask upgrade failed"$normal
+    else
+        echo $yellow"⚠ brew-cask-upgrade not installed (run: brew tap buo/cask-upgrade)"$normal
+    end
+
+    brew cleanup --prune=all
+    brew bundle cleanup --force
+    and echo $green"✓ Cleanup completed"$normal
+    or echo $red"✗ Cleanup failed"$normal
+
+    brew doctor
+    and echo $green"✓ Brew update complete!"$normal
+    or echo $red"✗ Brew update failed"$normal
+
+    echo
+    echo $blue"═══════════════════════════════════════"$normal
+    echo $green"✓ System update complete!"$normal
+    echo $blue"═══════════════════════════════════════"$normal
+end

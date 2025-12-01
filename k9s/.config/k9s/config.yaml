@@ -1,0 +1,15 @@
+k9s:
+  liveViewAutoRefresh: false
+  screenDumpDir: /tmp/dumps
+  refreshRate: 2
+  maxConnRetry: 5
+  readOnly: false
+  noExitOnCtrlC: false
+  ui:
+    enableMouse: false
+    headless: false
+    logoless: false
+    crumbsless: false
+    noIcons: false
+    reactive: true
+    skin: "catppuccin-macchiato"

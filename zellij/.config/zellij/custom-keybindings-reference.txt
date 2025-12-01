@@ -1,0 +1,189 @@
+╔═══════════════════════════════════════════════════════════════════════╗
+║              ZELLIJ CUSTOM KEYBINDINGS REFERENCE                      ║
+║         (Based on Default Config + Custom Ctrl+Alt Bindings)          ║
+╠═══════════════════════════════════════════════════════════════════════╣
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  YOUR CUSTOM KEYBINDINGS (Ctrl+Alt)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+SESSION MANAGEMENT:
+  Ctrl+Alt+D  →  Detach from session
+  Ctrl+Alt+Q  →  Quit/Close session  
+  Ctrl+Alt+W  →  Open session manager
+
+PANE FOCUS MOVEMENT:
+  Ctrl+Alt+H  →  Move focus LEFT
+  Ctrl+Alt+J  →  Move focus DOWN
+  Ctrl+Alt+K  →  Move focus UP
+  Ctrl+Alt+L  →  Move focus RIGHT
+
+PANE ACTIONS:
+  Ctrl+Alt+F  →  Toggle fullscreen
+
+TAB NAVIGATION:
+  Ctrl+Alt+]  →  Previous tab
+  Ctrl+Alt+[  →  Next tab
+
+NOTE: These use Ctrl+Alt (NOT Cmd). Terminal apps can't access Cmd key.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  DEFAULT MODE ACCESS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Ctrl+G  →  Lock mode
+  Ctrl+P  →  Pane mode
+  Ctrl+T  →  Tab mode
+  Ctrl+N  →  Resize mode
+  Ctrl+S  →  Scroll mode
+  Ctrl+H  →  Move mode
+  Ctrl+O  →  Session mode
+  Ctrl+B  →  Tmux mode
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  DEFAULT QUICK ACTIONS (Alt-based)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+PANE ACTIONS:
+  Alt+N           →  New pane
+  Alt+F           →  Toggle floating panes
+  Alt+H/←         →  Move focus/tab left
+  Alt+L/→         →  Move focus/tab right
+  Alt+J/↓         →  Move focus down
+  Alt+K/↑         →  Move focus up
+  Alt+= / Alt++   →  Increase size
+  Alt+-           →  Decrease size
+  Alt+P           →  Toggle pane in group
+  Alt+Shift+P     →  Toggle group marking
+
+TAB ACTIONS:
+  Alt+I           →  Move tab left
+  Alt+O           →  Move tab right
+  Alt+[           →  Previous swap layout
+  Alt+]           →  Next swap layout
+
+SYSTEM:
+  Ctrl+Q          →  Quit zellij
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  PANE MODE (Ctrl+P then...)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  H/J/K/L or ←↓↑→  →  Move focus
+  N                →  New pane
+  D                →  New pane down
+  R                →  New pane right
+  S                →  New stacked pane
+  X                →  Close pane
+  F                →  Toggle fullscreen
+  Z                →  Toggle frames
+  W                →  Toggle floating
+  E                →  Toggle embed/float
+  P                →  Switch focus
+  C                →  Rename pane
+  I                →  Pin pane
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TAB MODE (Ctrl+T then...)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  H/K or ←↑        →  Previous tab
+  L/J or →↓        →  Next tab
+  N                →  New tab
+  X                →  Close tab
+  R                →  Rename tab
+  S                →  Toggle sync input
+  B                →  Break pane to new tab
+  [                →  Break pane left
+  ]                →  Break pane right
+  1-9              →  Jump to tab 1-9
+  Tab              →  Toggle to last tab
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  RESIZE MODE (Ctrl+N then...)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  H/J/K/L or ←↓↑→  →  Increase in direction
+  Shift+H/J/K/L    →  Decrease in direction
+  = or +           →  Increase
+  -                →  Decrease
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  SCROLL MODE (Ctrl+S then...)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  J/↓              →  Scroll down
+  K/↑              →  Scroll up
+  D                →  Half page down
+  U                →  Half page up
+  Ctrl+F/PgDn/L/→  →  Full page down
+  Ctrl+B/PgUp/H/←  →  Full page up
+  E                →  Edit scrollback
+  S                →  Enter search mode
+  Ctrl+C           →  Return to bottom
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  SEARCH MODE (In search then...)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  N                →  Next match
+  P                →  Previous match
+  C                →  Toggle case sensitivity
+  W                →  Toggle wrap
+  O                →  Toggle whole word
+  J/K              →  Scroll during search
+  Ctrl+C           →  Exit search
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  SESSION MODE (Ctrl+O then...)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  D                →  Detach
+  W                →  Session manager
+  C                →  Configuration
+  P                →  Plugin manager
+  A                →  About
+  S                →  Share
+  Ctrl+S           →  Switch to scroll mode
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  MOVE MODE (Ctrl+H then...)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  H/J/K/L or ←↓↑→  →  Move pane in direction
+  N or Tab         →  Move pane forward
+  P                →  Move pane backward
+
+
+╠═══════════════════════════════════════════════════════════════════════╣
+║  KEY NOTES                                                            ║
+╠═══════════════════════════════════════════════════════════════════════╣
+
+  • Your custom keybindings use Ctrl+Alt (TWO modifiers)
+  • Terminal apps cannot access the Cmd/Super key
+  • These work from any mode (except locked)
+  • Default zellij keybindings remain unchanged
+  • Press Esc or Enter to exit any mode
+  • All configs are compatible with LazyVim
+
+╠═══════════════════════════════════════════════════════════════════════╣
+║  AVOIDING LAZYVIM CONFLICTS                                           ║
+╠═══════════════════════════════════════════════════════════════════════╣
+
+  Your Ctrl+Alt+H/J/K/L bindings won't conflict with LazyVim because:
+  • LazyVim uses Ctrl+W for window management (not Ctrl+Alt)
+  • LazyVim uses plain Ctrl for other functions
+  • Ctrl+Alt combinations are generally free
+
+  If you experience conflicts, use Ctrl+G to lock zellij.
+
+╚═══════════════════════════════════════════════════════════════════════╝

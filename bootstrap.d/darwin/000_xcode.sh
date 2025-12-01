@@ -1,0 +1,7 @@
+# requires xcode and tools!
+if ! command -v xcode-select -p &>/dev/null; then
+  echo "XCode must be installed! (run xcode-select --install)"
+  xcode-select --install
+else
+  echo "Xcode already installed"
+fi
