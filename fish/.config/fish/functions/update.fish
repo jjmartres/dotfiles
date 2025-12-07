@@ -61,6 +61,13 @@ function update --description "Update Neovim plugins, Homebrew packages, and sys
     end
     echo
 
+    # Update spec-kit from github
+    echo $yellow"➤ Updating Github Spec-kit..."$normal
+    uv tool install specify-cli --force --from git+https://github.com/github/spec-kit.git
+    and echo $green"✓ Spec-kit updated"$normal
+    or echo $red"✗ Spec-kit update failed"$normal
+    echo
+
     # Update Homebrew
     echo $yellow"➤ Updating Homebrew packages..."$normal
 

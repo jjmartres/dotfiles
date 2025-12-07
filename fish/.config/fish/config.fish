@@ -43,9 +43,6 @@ if not contains $_asdf_shims $PATH
 end
 set --erase _asdf_shims
 
-# Initialize zoxide
-zoxide init fish | source
-
 # Initialize fzf
 fzf --fish | source
 
@@ -58,6 +55,9 @@ set -gx EZA_COLORS (vivid generate $DEFAULT_THEME)
 
 # Make spinnaker use spin's completions
 complete -c spinnaker -w spin
+
+# Initialize zoxide
+zoxide init fish | source
 
 # The next line updates PATH for the Google Cloud SDK.
 if [ -f '/opt/homebrew/share/google-cloud-sdk/path.fish.inc' ]

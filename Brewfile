@@ -12,6 +12,7 @@ tap "lusingander/tap"                           # Formulae for Homebrew
 tap "fairwindsops/tap"                          # Formulae for Homebrew
 tap "robusta-dev/homebrew-krr"                  # Formulae for Homebrew
 tap "vladkens/tap"                              # Formulae for Homebrew
+tap "doganarif/tap"                             # Formulae for Homebrew
 
 ## Fonts
 cask "font-iosevka-nerd-font"
@@ -124,6 +125,7 @@ brew "istioctl"                                 # CLI tool for Istio service mes
 brew "jsonnet"                                  # Configuration language for Google Cloud Platform
 brew "jsonnet-bundler"                          # Package manager for Jsonnet
 brew "k9s"                                      # Kubernetes CLI To Manage Your Clusters In Style!
+brew "k9sight"                                  # A fast, keyboard-driven TUI for debugging Kubernetes workloads  
 brew "kubectx"                                  # Tool to switch between Kubernetes contexts    
 brew "kubecolor"                                # Add colors to kubectl output
 brew "kustomize"                                # Kubernetes native configuration management    
@@ -149,6 +151,7 @@ brew "atac"                                     # A terminal client for the API
 brew "zellij"                                   # A terminal session mananger
 brew "robusta-dev/homebrew-krr/krr"             # Kubernetes Resource Reporter
 brew "kubebuilder"                              # CLI tool for building Kubernetes APIs
+brew "pydantic"                                 # Data validation and settings management using Python type hints
 
 ## Graphics
 brew "asciinema"                                # Record and share terminal sessions

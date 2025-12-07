@@ -85,6 +85,13 @@ layout {
            args "ui" "--search-on-startup"
         }
     }
+
+    tab name="  nibbler" start_suspended=true {
+        pane {
+            command "nibbler"
+            args "run"
+        }
+    }
 }
 
 theme "catppuccin-macchiato"
