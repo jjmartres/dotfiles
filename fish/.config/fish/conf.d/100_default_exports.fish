@@ -84,3 +84,5 @@ set -gx ESPANSO_CONFIG_DIR "$HOME/.config/espanso/"
 set -gx ESPANSO_PACKAGE_DIR "$HOME/.config/espanso/match/"
 
 set -gx ZK_NOTEBOOK_DIR "$HOME/.notes"
+
+set -gx _ZO_DATA_DIR "$HOME/.local/share/zoxide"

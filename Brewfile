@@ -147,6 +147,7 @@ brew "jira-cli"                                 # A Textual User Interface for i
 brew "jiratui"                                  # A Textual User Interface for interacting with Atlassian Jira from your shell
 brew "go-task"                                  # Task runner / simpler Make alternative written in Go
 brew "serie"                                    # A rich git commit graph in your terminal, like magic
+brew "diff-so-fancy"                            # Compare anything with git
 brew "atac"                                     # A terminal client for the API
 brew "zellij"                                   # A terminal session mananger
 brew "robusta-dev/homebrew-krr/krr"             # Kubernetes Resource Reporter
