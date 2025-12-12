@@ -101,30 +101,19 @@ function session --description "Create or attach to a Zellij session with sessio
                 return
         end
     end
-    # Setup project notes and gitignore
-    set -l notes_file ".project_notes.md"
-    set -l gitignore_file ".gitignore"
-    # Create project notes file if it doesn't exist
-    if not test -f $notes_file
-        echo "# Project Notes" >$notes_file
-        echo "" >>$notes_file
-        echo "> Created on: "(date +"%Y-%m-%d %H:%M:%S") >>$notes_file
-        echo "Created $notes_file"
-    end
-    # Ensure .gitignore exists
-    if not test -f $gitignore_file
-        touch $gitignore_file
-        echo "Created $gitignore_file"
-    end
-    # Add project notes to .gitignore if not already present
-    if not grep -q "^$notes_file\$" $gitignore_file
-        echo $notes_file >>$gitignore_file
-        echo "Added $notes_file to $gitignore_file"
-    end
     # Normal session attach/create logic
     set -l session_name $argv[1]
     if test -z "$session_name"
         set session_name (basename $PWD)
+    end
+
+    # Create a zk note for the session if it doesn't exist
+    set -l note_title "session-$session_name"
+    if not zkg "$note_title" | string match -q -- "*"
+        set -l current_dir (pwd)
+        cd "$ZK_NOTEBOOK_DIR"
+        zk new --title "$note_title" --tags "session,$session_name"
+        cd "$current_dir"
     end
     # Delete dead session if it exists
     if zellij ls -n &| grep -E "^$session_name .*EXITED" >/dev/null
@@ -137,6 +126,12 @@ function session --description "Create or attach to a Zellij session with sessio
         zellij attach $session_name
     else
         echo "Creating new session: $session_name"
-        zellij --session $session_name --new-session-with-layout session
+        # Determine which layout to use based on the display
+        set -l display_check (system_profiler SPDisplaysDataType | grep -c "ZQE-CBA")
+        set -l layout_name "session_compact"
+        if test "$display_check" -gt 0
+            set layout_name "session"
+        end
+        zellij --session $session_name --new-session-with-layout $layout_name
     end
 end
