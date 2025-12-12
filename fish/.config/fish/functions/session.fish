@@ -12,6 +12,7 @@ function session --description "Create or attach to a Zellij session with sessio
                 echo "  session ls --plain   List all sessions (plain output)"
                 echo "  session kill <name>  Kill a specific session"
                 echo "  session help         Show this help message"
+                echo "  session note         Create or load ZK note associated with current session"
                 echo ""
                 echo "Examples:"
                 echo "  session              # Creates session named after current directory"
@@ -19,6 +20,7 @@ function session --description "Create or attach to a Zellij session with sessio
                 echo "  session ls           # Interactive session picker"
                 echo "  session kill old     # Kills session named 'old'"
                 echo "  session rm old       # Deletes session named 'old'"
+                echo "  session note         # Create or load ZK note associated with current session"
                 return
             case ls list
                 # Check for --plain flag
@@ -98,6 +100,15 @@ function session --description "Create or attach to a Zellij session with sessio
                     return 1
                 end
                 zellij delete-session $argv[2]
+                return
+            case note
+                set -l workdir_name (basename (pwd))
+                set -l session_name "working-session-$workdir_name"
+                if not zk list --tag=(basename (pwd)) -n 1 | read -s
+                    zk new --template project-session-notes.md --title $session_name
+                else
+                    zk edit --tag=$workdir_name
+                end
                 return
         end
     end
