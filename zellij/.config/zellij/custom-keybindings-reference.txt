@@ -9,7 +9,7 @@
 
 SESSION MANAGEMENT:
   Ctrl+Alt+D  →  Detach from session
-  Ctrl+Alt+Q  →  Quit/Close session  
+  Ctrl+Alt+Q  →  Quit/Close session
   Ctrl+Alt+W  →  Open session manager
 
 PANE FOCUS MOVEMENT:

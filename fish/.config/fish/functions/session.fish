@@ -107,14 +107,6 @@ function session --description "Create or attach to a Zellij session with sessio
         set session_name (basename $PWD)
     end
 
-    # Create a zk note for the session if it doesn't exist
-    set -l note_title "session-$session_name"
-    if not zkg "$note_title" | string match -q -- "*"
-        set -l current_dir (pwd)
-        cd "$ZK_NOTEBOOK_DIR"
-        zk new --title "$note_title" --tags "session,$session_name"
-        cd "$current_dir"
-    end
     # Delete dead session if it exists
     if zellij ls -n &| grep -E "^$session_name .*EXITED" >/dev/null
         echo "Cleaning up dead session: $session_name"
@@ -128,9 +120,9 @@ function session --description "Create or attach to a Zellij session with sessio
         echo "Creating new session: $session_name"
         # Determine which layout to use based on the display
         set -l display_check (system_profiler SPDisplaysDataType | grep -c "ZQE-CBA")
-        set -l layout_name "session_compact"
+        set -l layout_name session_compact
         if test "$display_check" -gt 0
-            set layout_name "session"
+            set layout_name session
         end
         zellij --session $session_name --new-session-with-layout $layout_name
     end

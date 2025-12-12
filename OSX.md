@@ -1,4 +1,4 @@
-# jjmartres dotfiles 
+# jjmartres dotfiles
 
 This repository contains everything to bootstrap my Macbook Pro.
 
@@ -78,7 +78,7 @@ More insights can be found in these lists:
 
 ## Upgrades
 
-On major version upgrades, binaries might be incompatible or need a local rebuild. 
+On major version upgrades, binaries might be incompatible or need a local rebuild.
 You can enforce a reinstall by running the two commands below, the second command
 only reinstalls all application casks.
 
@@ -93,7 +93,7 @@ When Xcode and compilers break, re-install the command line tools.
 ```
 sudo rm -rf /Library/Developer/CommandLineTools
 sudo xcode-select --install
-``` 
+```
 ## License
 
 MIT / BSD

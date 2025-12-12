@@ -3,7 +3,7 @@
 
 set page_size (vm_stat | awk '/page size of/ {print $8}')
 set stats (vm_stat | awk -v ps=$page_size '
-  /Pages active:/ {gsub(/\./,"",$3); active=$3} 
+  /Pages active:/ {gsub(/\./,"",$3); active=$3}
   /Pages wired down:/ {gsub(/\./,"",$4); wired=$4}
   /Pages occupied by compressor:/ {gsub(/\./,"",$5); compressed=$5}
   END {

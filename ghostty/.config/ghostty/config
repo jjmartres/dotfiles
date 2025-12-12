@@ -11,16 +11,16 @@ mouse-scroll-multiplier = 2
 shell-integration = fish
 shell-integration-features = no-cursor,sudo,no-title
 theme = dark:catppuccin-macchiato.conf,light:catppuccin-latte.conf
-window-padding-balance = true 
+window-padding-balance = true
 window-save-state = always
 unfocused-split-opacity = 0.90
-split-divider-color = #b7bdf8	
+split-divider-color = #b7bdf8
 
 # keybindings
 keybind = cmd+s>n=new_window
 keybind = cmd+s>r=reload_config
 keybind = cmd+s>x=close_surface
-## tabs 
+## tabs
 keybind = cmd+s>c=new_tab
 keybind = cmd+s>shift+l=next_tab
 keybind = cmd+s>shift+h=previous_tab

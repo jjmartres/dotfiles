@@ -8,7 +8,7 @@ tap "safedep/tap"                               # Tap for safedep
 tap "hashicorp/tap"                             # Tap for Hashicorp tools
 tap "koekeishiya/formulae"                      # Formulae for Homebrew
 tap "FelixKratz/formulae"                       # Formulae for Homebrew
-tap "lusingander/tap"                           # Formulae for Homebrew 
+tap "lusingander/tap"                           # Formulae for Homebrew
 tap "fairwindsops/tap"                          # Formulae for Homebrew
 tap "robusta-dev/homebrew-krr"                  # Formulae for Homebrew
 tap "vladkens/tap"                              # Formulae for Homebrew
@@ -28,7 +28,7 @@ brew "binutils"                                 # Collection of binary tools
 brew "coreutils"                                # Basic command-line utilities (ls, cp, etc.)
 brew "curl"                                     # Tool to transfer data from/to a server
 brew "dnstracer"                                # Traces DNS query paths
-brew "eza"                                      # ls replacement easy to use and simple to install 
+brew "eza"                                      # ls replacement easy to use and simple to install
 brew "fd"                                       # Simple, fast and user-friendly alternative to 'find'
 brew "fish"                                     # Fish shell (alternative to zsh)
 brew "fisher"                                   # Plugin manager for fish
@@ -37,7 +37,7 @@ brew "fzf"                                      # Fuzzy finder for the command l
 brew "gawk"                                     # GNU version of the awk text processing tool
 brew "gmp"                                      # GNU Multiple Precision Arithmetic Library
 brew "gnu-getopt"                               # GNU version of getopt for command-line options
-brew "gnu-indent"                               # GNU program for indenting C code  
+brew "gnu-indent"                               # GNU program for indenting C code
 brew "gnu-sed"                                  # GNU stream editor for text manipulation
 brew "gnu-tar"                                  # GNU version of the tar archiving utility
 brew "gnutls"                                   # GNU Transport Layer Security library
@@ -72,10 +72,10 @@ brew "fastfetch"                                # Fast system information script
 brew "superfile"                                # Perfect Terminal-based file manager
 brew "zk"                                       # Zettelkasten CLI
 
-## Improve OSx UI experience 
-#brew "yabai" if OS.mac?                          # Yet Another Bouncer for macOS  
+## Improve OSx UI experience
+#brew "yabai" if OS.mac?                          # Yet Another Bouncer for macOS
 #brew "skhd" if OS.mac?                           # Simple hotkey daemon for macOS
-#brew "borders" if OS.mac?                        # lightweight tool designed to add colored borders to user windows 
+#brew "borders" if OS.mac?                        # lightweight tool designed to add colored borders to user windows
 
 ## Versioning (Git)
 brew "gh"                                       # GitHub CLI
@@ -95,7 +95,7 @@ brew "jq"                                       # Lightweight and flexible comma
 brew "lua"                                      # Powerful, lightweight programming language
 brew "lua-language-server"                      # Language Server Protocol implementation for Lua
 brew "luajit", args: ["HEAD"]                   # High-performance Lua JIT compiler (HEAD version)
-brew "markdown-toc"                             # Generate table of contents for Markdown files 
+brew "markdown-toc"                             # Generate table of contents for Markdown files
 brew "mysql-client"                             # MySQL command-line client
 brew "neovim"                                   # Hyperextensible Vim-based text editor
 brew "tree-sitter-cli"                          # CLI tool for managing Tree-sitter parsers
@@ -103,7 +103,7 @@ brew "nvm"                                      # Node.js version management
 brew "prettierd"                                # Opinionated code formatter (daemon)
 brew "prettier"                                 # Opinionated code formatter
 brew "rust"                                     # Systems programming language
-brew "yq"                                       # Portable command-line YAML processor  
+brew "yq"                                       # Portable command-line YAML processor
 brew "uv"                                       # Universal package manager for cli tools
 brew "golangci-lint"                            # Fast linters Runner for Go
 brew "asdf"                                     # Extendable version manager with support for Ruby, Node.js, Elixir, Erlang & more
@@ -125,10 +125,10 @@ brew "istioctl"                                 # CLI tool for Istio service mes
 brew "jsonnet"                                  # Configuration language for Google Cloud Platform
 brew "jsonnet-bundler"                          # Package manager for Jsonnet
 brew "k9s"                                      # Kubernetes CLI To Manage Your Clusters In Style!
-brew "k9sight"                                  # A fast, keyboard-driven TUI for debugging Kubernetes workloads  
-brew "kubectx"                                  # Tool to switch between Kubernetes contexts    
+brew "k9sight"                                  # A fast, keyboard-driven TUI for debugging Kubernetes workloads
+brew "kubectx"                                  # Tool to switch between Kubernetes contexts
 brew "kubecolor"                                # Add colors to kubectl output
-brew "kustomize"                                # Kubernetes native configuration management    
+brew "kustomize"                                # Kubernetes native configuration management
 brew "mongodb-atlas"                            # MongoDB Atlas CLI
 brew "polaris"                                  # Validation of Kubernetes YAML
 brew "pre-commit"                               # Framework for managing and maintaining multi-language pre-commit hooks
@@ -142,8 +142,8 @@ brew "terrahelp"                                # Collection of helpful Terrafor
 brew "tflint"                                   # Terraform linter
 brew "tfsec"                                    # Security scanner for Terraform code
 brew "terrascan"                                # Static code analyzer for Infrastructure as Code
-brew "tfenv"                                    # Terraform version manager 
-brew "jira-cli"                                 # A Textual User Interface for interacting with Atlassian Jira from your shell 
+brew "tfenv"                                    # Terraform version manager
+brew "jira-cli"                                 # A Textual User Interface for interacting with Atlassian Jira from your shell
 brew "jiratui"                                  # A Textual User Interface for interacting with Atlassian Jira from your shell
 brew "go-task"                                  # Task runner / simpler Make alternative written in Go
 brew "serie"                                    # A rich git commit graph in your terminal, like magic
@@ -169,7 +169,7 @@ brew "safedep/tap/vet"                                  # Safely manage your dep
 brew "aquasecurity/trivy/trivy"                 # Simple and comprehensive vulnerability scanner
 
 ## AI
-brew "ollama"                                   # Run large language models locally 
+brew "ollama"                                   # Run large language models locally
 brew "opencode"                         # The AI coding agent built for the terminal
 
 ## Fun
@@ -189,7 +189,7 @@ cask "visual-studio-code"                       # Visula Studio Code editor
 cask "macdown"                                  # Markdown editor
 cask "dbeaver-community"                        # Database management tool
 cask "vlc"                                      # Cross-platform multimedia player
-cask "cyberduck"                                # FTP, SFTP, WebDAV, Amazon S3, OpenStack Swift, Backblaze B2, Microsoft Azure & OneDrive, Google Drive 
+cask "cyberduck"                                # FTP, SFTP, WebDAV, Amazon S3, OpenStack Swift, Backblaze B2, Microsoft Azure & OneDrive, Google Drive
 cask "appcleaner"                               # Cleaner for macOS apps
 cask "maccy"                                    # Clipboard manager
 cask "soulseek"                                 # P2P music streamer

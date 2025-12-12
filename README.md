@@ -1,4 +1,4 @@
-# jjmartres dotfiles 
+# jjmartres dotfiles
 
 ## Platform
 
