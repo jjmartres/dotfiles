@@ -97,6 +97,7 @@ brew "lua-language-server"                      # Language Server Protocol imple
 brew "luajit", args: ["HEAD"]                   # High-performance Lua JIT compiler (HEAD version)
 brew "markdown-toc"                             # Generate table of contents for Markdown files
 brew "mysql-client"                             # MySQL command-line client
+brew "libpq"                                    # PostgreSQL C client library
 brew "neovim"                                   # Hyperextensible Vim-based text editor
 brew "tree-sitter-cli"                          # CLI tool for managing Tree-sitter parsers
 brew "nvm"                                      # Node.js version management
@@ -179,6 +180,7 @@ brew "fortune"                                  # Print a random, hopefully inte
 ## Cask Applications (General)
 cask "ghostty"                                  # Modern and customizable terminal emulator
 cask "gitkraken"                                # Cross-platform Git GUI client
+cask "gitkraken-cli"                            # Cross-platform Git Cli
 cask "gcloud-cli"                               # Command-line tool for Google Cloud Platform
 cask "hiddenbar"                                # Utility to hide menu bar icons
 cask "httpie-desktop"                           # Modern command-line HTTP client
