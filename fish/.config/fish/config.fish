@@ -27,7 +27,13 @@ end
 bind --preset \cC cancel-commandline
 
 # Extends PATH
-fish_add_path -g $HOME/.local/bin $HOMEBREW_PREFIX/share/google-cloud-sdk/bin $HOME/go/bin $HOME/.cargo/bin $HOME/.config/zellij/scripts $HOMEBREW_PREFIX/opt/libpq/bin
+fish_add_path -g $HOME/.local/bin \
+    $HOMEBREW_PREFIX/share/google-cloud-sdk/bin \
+    $HOME/go/bin \
+    $HOME/.cargo/bin \
+    $HOME/.config/zellij/scripts \
+    $HOMEBREW_PREFIX/opt/libpq/bin \
+    $HOMEBREW_PREFIX/opt/mysql-client/bin
 
 # ASDF configuration code
 if test -z $ASDF_DATA_DIR

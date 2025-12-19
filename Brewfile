@@ -196,3 +196,4 @@ cask "appcleaner"                               # Cleaner for macOS apps
 cask "maccy"                                    # Clipboard manager
 cask "soulseek"                                 # P2P music streamer
 cask "discord"                                  # Chat with your friends
+cask "opencode-desktop"                         # The AI coding agent built for the terminal
