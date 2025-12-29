@@ -1,3 +1,5 @@
+eval (/opt/homebrew/bin/brew shellenv)
+
 # Set default theme
 if type -q defaults
     defaults read -g AppleInterfaceStyle &>/dev/null

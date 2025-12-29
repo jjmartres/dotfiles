@@ -71,6 +71,7 @@ brew "zoxide"                                   # Smarter cd command, learns you
 brew "fastfetch"                                # Fast system information script
 brew "superfile"                                # Perfect Terminal-based file manager
 brew "zk"                                       # Zettelkasten CLI
+brew "aria2"                                     # A modern, lightweight, and efficient download utility
 
 ## Improve OSx UI experience
 #brew "yabai" if OS.mac?                          # Yet Another Bouncer for macOS
@@ -197,3 +198,5 @@ cask "maccy"                                    # Clipboard manager
 cask "soulseek"                                 # P2P music streamer
 cask "discord"                                  # Chat with your friends
 cask "opencode-desktop"                         # The AI coding agent built for the terminal
+cask "devpod"                                   # DevPod is a tool used to create reproducible developer environments.
+cask "zed"                                      # Zed is a minimal code editor crafted for speed and collaboration with humans and AI.

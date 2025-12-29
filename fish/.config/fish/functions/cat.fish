@@ -1,4 +1,8 @@
 function cat
+    if test (count $argv) -eq 0
+        return
+    end
+
     # if file extension ends with .md or .mdx, use glow
     if string match -q "*.md" $argv
         glow $argv

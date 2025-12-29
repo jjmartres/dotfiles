@@ -1,22 +1,7 @@
 # Disable the fish greeting message
 set fish_greeting ""
 
-# Setup brew
-if test -d /home/linuxbrew/.linuxbrew # Linux
-    set -gx HOMEBREW_PREFIX "/home/linuxbrew/.linuxbrew"
-    set -gx HOMEBREW_CELLAR "$HOMEBREW_PREFIX/Cellar"
-    set -gx HOMEBREW_REPOSITORY "$HOMEBREW_PREFIX/Homebrew"
-    fish_add_path -g "$HOMEBREW_PREFIX/bin" "$HOMEBREW_PREFIX/sbin" "$HOME/.local/bin" "$HOME/go/bin"
 
-    ! set -q MANPATH; and set MANPATH ''
-    set -gx MANPATH "$HOMEBREW_PREFIX/share/man" $MANPATH
-
-    ! set -q INFOPATH; and set INFOPATH ''
-    set -gx INFOPATH "$HOMEBREW_PREFIX/share/info" $INFOPATH
-
-else if test -d /opt/homebrew # MacOS
-    eval (/opt/homebrew/bin/brew shellenv)
-end
 
 if status is-interactive
     atuin init fish | source
