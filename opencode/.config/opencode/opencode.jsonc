@@ -109,5 +109,10 @@
       ],
       "enabled": false,
     },
+    "smartplaylist": {
+      "type": "remote",
+      "url": "http://personal.local:8000/mcp",
+      "enabled": true,
+    },
   },
 }
