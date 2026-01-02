@@ -1,0 +1,89 @@
+layout {
+    default_tab_template {
+        children
+        pane size=1 borderless=true {
+            plugin location="file:~/.config/zellij/plugins/zjstatus.wasm" {
+                format_left   "#[fg=#a6da95,bold]󰆦 #[fg=#c6a0f6,bold]{session}{command_git_url} #[fg=#cad3f5]- {mode}"
+                format_center "{tabs}"
+                format_right  "#[fg=#f5a97f]{command_cpu}#[fg=#5b6078] - #[fg=#91d7e3]{command_ram} #[fg=#5b6078] - #[fg=#8aadf4,bold]{datetime}"
+                format_space  ""
+
+                // Git URL command
+                command_git_url_command     "fish -c '/opt/homebrew/bin/git remote get-url origin 2>/dev/null | xargs'"
+                command_git_url_format      " #[fg=#89b4fa]({stdout})"
+                command_git_url_interval    "600"
+                command_git_url_rendermode  "static"
+
+                // CPU usage command
+                command_cpu_command     "cpu.fish"
+                command_cpu_format      "  {stdout}%"
+                command_cpu_interval    "30"
+                command_cpu_rendermode  "static"
+
+                // RAM usage command
+                command_ram_command     "ram.fish"
+                command_ram_format      "  {stdout}"
+                command_ram_interval    "60"
+                command_ram_rendermode  "static"
+
+                border_enabled  "false"
+                hide_frame_for_single_pane "true"
+
+                mode_normal  "#[fg=#a6da95]NORMAL"
+                mode_locked  "#[fg=#ed8796]LOCKED"
+                mode_resize  "#[fg=#f5a97f]RESIZE"
+                mode_pane    "#[fg=#8aadf4]PANE"
+                mode_tab     "#[fg=#c6a0f6]TAB"
+                mode_scroll  "#[fg=#eed49f]SCROLL"
+                mode_move    "#[fg=#91d7e3]MOVE"
+                mode_search  "#[fg=#f5bde6]SEARCH"
+
+                session         "{name}"
+                datetime        "  {format}"
+                datetime_format "%d/%m/%Y %H:%M"
+                datetime_timezone "Europe/Paris"
+
+                tab_normal   "#[fg=#8aadf4] {name} "
+                tab_active   "#[fg=#a6da95,bold] {name} "
+                tab_separator "#[fg=#5b6078] - "
+            }
+        }
+    }
+
+    tab name="󰼀  main" focus=true {
+      pane {
+         command "nvim"
+         args "."
+        focus true
+      }
+    }
+
+    tab name="󱜙  opencode" start_suspended=true {
+        pane {
+            command "fish"
+            args "-c" "opencode"
+        }
+    }
+
+    tab name="󱙺  reachy" start_suspended=true {
+        pane {
+            command "fish"
+            args "-c" "make setup && uv run mjpython -m reachy_mini.daemon.app.main --sim"
+        }
+    }
+
+    tab name="󱘒  notes" start_suspended=true {
+        pane {
+          command "fish"
+          args "-c" "session note"
+        }
+    }
+
+    tab name="  git" start_suspended=true {
+        pane {
+          command "lazygit"
+        }
+    }
+}
+
+theme "catppuccin-macchiato"

@@ -129,12 +129,19 @@ function session --description "Create or attach to a Zellij session with sessio
         zellij attach $session_name
     else
         echo "Creating new session: $session_name"
-        # Determine which layout to use based on the display
-        set -l display_check (system_profiler SPDisplaysDataType | grep -c "ZQE-CBA")
-        set -l layout_name session_compact
-        if test "$display_check" -gt 0
-            set layout_name session
+
+        # Check display once
+        set -l is_external (test (system_profiler SPDisplaysDataType | grep -c "ZQE-CBA") -gt 0; and echo 1; or echo 0)
+
+        # Determine layout in one switch
+        switch (basename $PWD)
+            case '*reachy*'
+                set layout_name (test $is_external -eq 1; and echo "reachy_mini_session"; or echo "reachy_mini_session_compact")
+            case '*'
+                set layout_name (test $is_external -eq 1; and echo "session"; or echo "session_compact")
         end
+        echo "Layout: $layout_name"
+
         zellij --session $session_name --new-session-with-layout $layout_name
     end
 end
