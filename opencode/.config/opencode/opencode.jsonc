@@ -4,7 +4,7 @@
   "autoupdate": true,
   "model": "google-vertex/gemini-2.5-pro",
   "small_model": "google-vertex/gemini-2.5-flash",
-  // See https://models.dev for available models
+  "instructions": [".opencode/rules/*.md"],
   "provider": {
     "google-vertex": {
       "models": {
