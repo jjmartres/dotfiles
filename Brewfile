@@ -15,6 +15,7 @@ tap "rvarunrathod/tap"                          # Formulae for Homebrew
 tap "safedep/tap"                               # Tap for safedep
 tap "vladkens/tap"                              # Formulae for Homebrew
 tap "rvarunrathod/tap"                          # Formulae for Homebrew
+tap "steipete/tap"                              # Formulae for Homebrew
 
 ## Fonts
 cask "font-iosevka-nerd-font"
@@ -124,6 +125,7 @@ brew "gobject-introspection"                    # GObject introspection tools
 brew "pkg-config"                               # Package management tool for libraries
 brew "gstreamer"                                # GStreamer Multimedia Framework
 brew "libnice-gstreamer"                        # ICE library for GStreamer
+brew "huggingface-cli"                          # CLI for huggingface models
 
 ## DevOps Tools
 brew "ansible"                                  # Automation engine
@@ -207,4 +209,4 @@ cask "visual-studio-code"                       # Visula Studio Code editor
 cask "vlc"                                      # Cross-platform multimedia player
 cask "zed"                                      # Zed is a minimal code editor crafted for speed and collaboration with humans and AI.
 cask "hifidelity"                               # HiFiDeity is a free, open-source audio player for Windows, macOS, and Linux.
-cask "steipete/tap/codexbar"                    # Show usage stats for OpenAI Codex and Claude Code, without having to login.
+cask "codexbar"                    # Show usage stats for OpenAI Codex and Claude Code, without having to login.
