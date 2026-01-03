@@ -207,3 +207,4 @@ cask "visual-studio-code"                       # Visula Studio Code editor
 cask "vlc"                                      # Cross-platform multimedia player
 cask "zed"                                      # Zed is a minimal code editor crafted for speed and collaboration with humans and AI.
 cask "hifidelity"                               # HiFiDeity is a free, open-source audio player for Windows, macOS, and Linux.
+cask "steipete/tap/codexbar"                    # Show usage stats for OpenAI Codex and Claude Code, without having to login.
