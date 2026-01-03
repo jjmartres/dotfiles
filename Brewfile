@@ -119,6 +119,12 @@ brew "tree-sitter-cli"                          # CLI tool for managing Tree-sit
 brew "uv"                                       # Universal package manager for cli tools
 brew "yq"                                       # Portable command-line YAML processor
 
+## For Reachy Mini
+brew "gobject-introspection"                    # GObject introspection tools
+brew "pkg-config"                               # Package management tool for libraries
+brew "gstreamer"                                # GStreamer Multimedia Framework
+brew "libnice-gstreamer"                        # ICE library for GStreamer
+
 ## DevOps Tools
 brew "ansible"                                  # Automation engine
 brew "atac"                                     # A terminal client for the API
