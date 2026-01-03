@@ -65,7 +65,11 @@ layout {
         }
     }
 
-    tab name="󱙺  reachy" start_suspended=true {
+    tab name="  terminal" start_suspended=true {
+        pane {}
+    }
+
+    tab name="󱙺  sim" start_suspended=true {
         pane {
             command "fish"
             args "-c" "make setup && uv run mjpython -m reachy_mini.daemon.app.main --sim"
