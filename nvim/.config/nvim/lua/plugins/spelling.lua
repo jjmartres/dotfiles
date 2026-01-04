@@ -2,7 +2,7 @@ return {
   {
     "mason-org/mason.nvim",
     opts = function(_, opts)
-      vim.list_extend(opts.ensure_installed, { "typos-ls", "harper-ls" })
+      vim.list_extend(opts.ensure_installed, { "typos-lsp", "harper-ls" })
     end,
   },
   {
@@ -26,11 +26,11 @@ return {
                 RepeatedWords = true,
                 Spaces = true,
                 Matcher = true,
-                CorrectNumberSuffix = true
+                CorrectNumberSuffix = true,
               },
               diagnosticSeverity = "hint",
-            }
-          }
+            },
+          },
         },
       },
     },

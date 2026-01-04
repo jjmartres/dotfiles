@@ -119,6 +119,7 @@ brew "rust"                                     # Systems programming language
 brew "tree-sitter-cli"                          # CLI tool for managing Tree-sitter parsers
 brew "uv"                                       # Universal package manager for cli tools
 brew "yq"                                       # Portable command-line YAML processor
+brew "harper"                                    # The Free Grammar Checker That Respects Your Privacy
 
 ## For Reachy Mini
 brew "gobject-introspection"                    # GObject introspection tools
@@ -199,7 +200,6 @@ cask "gitkraken-cli"                            # Cross-platform Git Cli
 cask "gcloud-cli"                               # Command-line tool for Google Cloud Platform
 cask "grandperspective"                         # Disk usage
 cask "hiddenbar"                                # Utility to hide menu bar icons
-cask "httpie-desktop"                           # Modern command-line HTTP client
 cask "maccy"                                    # Clipboard manager
 cask "macdown"                                  # Markdown editor
 cask "opencode-desktop"                         # The AI coding agent built for the terminal
