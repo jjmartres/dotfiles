@@ -198,7 +198,6 @@ cask "ghostty"                                  # Modern and customizable termin
 cask "gitkraken"                                # Cross-platform Git GUI client
 cask "gitkraken-cli"                            # Cross-platform Git Cli
 cask "gcloud-cli"                               # Command-line tool for Google Cloud Platform
-cask "grandperspective"                         # Disk usage
 cask "hiddenbar"                                # Utility to hide menu bar icons
 cask "maccy"                                    # Clipboard manager
 cask "macdown"                                  # Markdown editor
