@@ -1,7 +1,7 @@
 function commit
     $HOMEBREW_PREFIX/bin/opencode run \
         --agent build \
-        -- model google-vertex/gemini-2.5-pro \
+        --model google-vertex/gemini-2.5-pro \
         /commit
     git push \
         -o merge_request.create \
