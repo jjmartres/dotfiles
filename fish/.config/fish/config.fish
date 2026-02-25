@@ -1,8 +1,6 @@
 # Disable the fish greeting message
 set fish_greeting ""
 
-
-
 if status is-interactive
     atuin init fish | source
 end
@@ -15,6 +13,7 @@ bind --preset \cC cancel-commandline
 fish_add_path -g $HOME/.local/bin \
     $HOMEBREW_PREFIX/share/google-cloud-sdk/bin \
     $HOME/go/bin \
+    $HOME/.asdf/shims \
     $HOME/.cargo/bin \
     $HOME/.config/zellij/scripts \
     $HOMEBREW_PREFIX/opt/libpq/bin \

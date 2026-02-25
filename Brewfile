@@ -16,6 +16,7 @@ tap "safedep/tap"                               # Tap for safedep
 tap "vladkens/tap"                              # Formulae for Homebrew
 tap "rvarunrathod/tap"                          # Formulae for Homebrew
 tap "steipete/tap"                              # Formulae for Homebrew
+tap "macos-fuse-t/homebrew-cask"                # Formulae for Homebrew
 
 ## Fonts
 cask "font-iosevka-nerd-font"
@@ -208,4 +209,5 @@ cask "visual-studio-code"                       # Visula Studio Code editor
 cask "vlc"                                      # Cross-platform multimedia player
 cask "zed"                                      # Zed is a minimal code editor crafted for speed and collaboration with humans and AI.
 cask "hifidelity"                               # HiFiDeity is a free, open-source audio player for Windows, macOS, and Linux.
-cask "codexbar"                    # Show usage stats for OpenAI Codex and Claude Code, without having to login.
+cask "macos-fuse-t/homebrew-cask/fuse-t"        # Fuse-T is a cross-platform file system in userspace
+cask "macos-fuse-t/homebrew-cask/fuse-t-sshfs"  # Fuse-T is a cross-platform file system in userspace
