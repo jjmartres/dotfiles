@@ -17,6 +17,9 @@ tap "vladkens/tap"                              # Formulae for Homebrew
 tap "rvarunrathod/tap"                          # Formulae for Homebrew
 tap "steipete/tap"                              # Formulae for Homebrew
 tap "macos-fuse-t/homebrew-cask"                # Formulae for Homebrew
+tap "AlexsJones/llmfit"                         # Formulae for Homebrew
+tap "arimxyer/tap"                              # Formulae for Homebrew
+tap "gromgit/brewtils"                          # Formulae for Homebrew
 
 ## Fonts
 cask "font-iosevka-nerd-font"
@@ -184,6 +187,10 @@ brew "safedep/tap/vet"                          # Safely manage your dependencie
 ## AI
 brew "ollama"                                   # Run large language models locally
 brew "opencode"                                 # The AI coding agent built for the terminal
+brew "llmfit"                                   # LLM Fit is a tool that allows you to find which model runs on your hardware
+brew "models"                                   # A terminal dashboard for comparing AI model providers
+brew "gromgit/brewtils/taproom"                 # Taproom is a tool for discovering and installing Homebrew formulae
+
 
 ## Fun
 brew "c2048"                                    # Terminal version of the 2048 game
