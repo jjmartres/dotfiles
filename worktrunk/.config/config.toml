@@ -1,0 +1,4 @@
+worktree-path = "{{ repo_path }}/.worktrees/{{ branch | sanitize }}"
+
+[commit.generation]
+command = "$HOMEBREW_PREFIX/bin/opencode run --agent build --model google-vertex/gemini-2.5-pro /commit"
