@@ -16,6 +16,7 @@ fish_add_path -g $HOME/.local/bin \
     $HOME/.asdf/shims \
     $HOME/.cargo/bin \
     $HOME/.config/zellij/scripts \
+    $HOME/.lmstudio/bin \
     $HOMEBREW_PREFIX/opt/libpq/bin \
     $HOMEBREW_PREFIX/opt/mysql-client/bin
 

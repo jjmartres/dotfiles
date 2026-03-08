@@ -124,6 +124,7 @@ brew "tree-sitter-cli"                          # CLI tool for managing Tree-sit
 brew "uv"                                       # Universal package manager for cli tools
 brew "yq"                                       # Portable command-line YAML processor
 brew "harper"                                    # The Free Grammar Checker That Respects Your Privacy
+brew "worktrunk"                                # Worktrunk is a CLI for git worktree management, designed for running AI agents in parallel.
 
 ## For Reachy Mini
 brew "gobject-introspection"                    # GObject introspection tools
@@ -208,13 +209,12 @@ cask "gitkraken-cli"                            # Cross-platform Git Cli
 cask "gcloud-cli"                               # Command-line tool for Google Cloud Platform
 cask "hiddenbar"                                # Utility to hide menu bar icons
 cask "maccy"                                    # Clipboard manager
-cask "macdown"                                  # Markdown editor
 cask "opencode-desktop"                         # The AI coding agent built for the terminal
 cask "soulseek"                                 # P2P music streamer
 cask "steam"                                    # Steam client
-cask "visual-studio-code"                       # Visula Studio Code editor
 cask "vlc"                                      # Cross-platform multimedia player
 cask "zed"                                      # Zed is a minimal code editor crafted for speed and collaboration with humans and AI.
 cask "hifidelity"                               # HiFiDeity is a free, open-source audio player for Windows, macOS, and Linux.
 cask "macos-fuse-t/homebrew-cask/fuse-t"        # Fuse-T is a cross-platform file system in userspace
 cask "macos-fuse-t/homebrew-cask/fuse-t-sshfs"  # Fuse-T is a cross-platform file system in userspace
+cask "lm-studio"                                # Run AI models, locally and privately.
