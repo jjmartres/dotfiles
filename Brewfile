@@ -106,6 +106,7 @@ brew "gcc"                                      # GNU Compiler Collection
 brew "glow"                                     # Render markdown on the terminal
 brew "golangci-lint"                            # Fast linters Runner for Go
 brew "jq"                                       # Lightweight and flexible command-line JSON processor
+brew "csvkit"                                   # A suite of command-line tools for converting to and working with CSV
 brew "libpq"                                    # PostgreSQL C client library
 brew "lua"                                      # Powerful, lightweight programming language
 brew "lua-language-server"                      # Language Server Protocol implementation for Lua
