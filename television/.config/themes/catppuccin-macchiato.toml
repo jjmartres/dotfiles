@@ -1,0 +1,41 @@
+# Catppuccin Macchiato — Television Theme
+# https://catppuccin.com/palette
+#
+# Palette reference:
+#   base      #24273a  mantle   #1e2030  crust    #181926
+#   surface0  #363a4f  surface1 #494d64  surface2 #5b6078
+#   overlay0  #6e738d  overlay1 #8087a2  overlay2 #939ab7
+#   subtext0  #a5adcb  subtext1 #b8c0e0  text     #cad3f5
+#   lavender  #b7bdf8  blue     #8aadf4  sapphire #7dc4e4
+#   sky       #91d7e3  teal     #8bd5ca  green    #a6da95
+#   yellow    #eed49f  peach    #f5a97f  maroon   #ee99a0
+#   red       #ed8796  mauve    #c6a0f6  pink     #f5bde6
+#   flamingo  #f0c6c6  rosewater #f4dbd6
+
+# ── General ──────────────────────────────────────────────────────────────────
+background     = '#24273a'  # base
+border_fg      = '#494d64'  # surface1
+text_fg        = '#cad3f5'  # text
+dimmed_text_fg = '#6e738d'  # overlay0
+
+# ── Input ─────────────────────────────────────────────────────────────────────
+input_text_fg   = '#c6a0f6'  # mauve  — typed query
+result_count_fg = '#f5a97f'  # peach  — counter
+
+# ── Results ───────────────────────────────────────────────────────────────────
+result_name_fg        = '#8aadf4'  # blue
+result_line_number_fg = '#eed49f'  # yellow
+result_value_fg       = '#cad3f5'  # text
+selection_fg          = '#cad3f5'  # text
+selection_bg          = '#363a4f'  # surface0
+match_fg              = '#ed8796'  # red
+
+# ── Preview ───────────────────────────────────────────────────────────────────
+preview_title_fg = '#8bd5ca'  # teal
+
+# ── Mode pills ────────────────────────────────────────────────────────────────
+channel_mode_fg         = '#24273a'  # base
+channel_mode_bg         = '#c6a0f6'  # mauve
+remote_control_mode_fg  = '#24273a'  # base
+remote_control_mode_bg  = '#a6da95'  # green
+send_to_channel_mode_fg = '#91d7e3'  # sky

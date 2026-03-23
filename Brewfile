@@ -44,6 +44,7 @@ brew "findutils"                                # Utilities for finding files
 brew "fish"                                     # Fish shell (alternative to zsh)
 brew "fisher"                                   # Plugin manager for fish
 brew "fzf"                                      # Fuzzy finder for the command line
+brew "television"                               # A fast, portable and hackable fuzzy finder for the terminal.
 brew "gawk"                                     # GNU version of the awk text processing tool
 brew "gmp"                                      # GNU Multiple Precision Arithmetic Library
 brew "gnu-getopt"                               # GNU version of getopt for command-line options
