@@ -36,6 +36,7 @@ brew "binutils"                                 # Collection of binary tools
 brew "btop"                                     # A monitor of resources
 brew "coreutils"                                # Basic command-line utilities (ls, cp, etc.)
 brew "curl"                                     # Tool to transfer data from/to a server
+brew "httpie"                                   # HTTPie is a command line HTTP client
 brew "dnstracer"                                # Traces DNS query paths
 brew "eza"                                      # ls replacement easy to use and simple to install
 brew "fastfetch"                                # Fast system information script
@@ -44,6 +45,7 @@ brew "findutils"                                # Utilities for finding files
 brew "fish"                                     # Fish shell (alternative to zsh)
 brew "fisher"                                   # Plugin manager for fish
 brew "fzf"                                      # Fuzzy finder for the command line
+brew "television"                               # A fast, portable and hackable fuzzy finder for the terminal.
 brew "gawk"                                     # GNU version of the awk text processing tool
 brew "gmp"                                      # GNU Multiple Precision Arithmetic Library
 brew "gnu-getopt"                               # GNU version of getopt for command-line options
@@ -106,6 +108,7 @@ brew "gcc"                                      # GNU Compiler Collection
 brew "glow"                                     # Render markdown on the terminal
 brew "golangci-lint"                            # Fast linters Runner for Go
 brew "jq"                                       # Lightweight and flexible command-line JSON processor
+brew "csvkit"                                   # A suite of command-line tools for converting to and working with CSV
 brew "libpq"                                    # PostgreSQL C client library
 brew "lua"                                      # Powerful, lightweight programming language
 brew "lua-language-server"                      # Language Server Protocol implementation for Lua
@@ -218,3 +221,5 @@ cask "hifidelity"                               # HiFiDeity is a free, open-sour
 cask "macos-fuse-t/homebrew-cask/fuse-t"        # Fuse-T is a cross-platform file system in userspace
 cask "macos-fuse-t/homebrew-cask/fuse-t-sshfs"  # Fuse-T is a cross-platform file system in userspace
 cask "lm-studio"                                # Run AI models, locally and privately.
+cask "transmission"                             # A fast, easy, and free BitTorrent client
+cask "musicbrainz-picard"                       # MusicBrain is a free, open-source, cross-platform application for analyzing and comparing your music collections.
