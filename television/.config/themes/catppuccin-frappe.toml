@@ -1,0 +1,41 @@
+# Catppuccin Frappé — Television Theme
+# https://catppuccin.com/palette
+#
+# Palette reference:
+#   base      #303446  mantle   #292c3c  crust    #232634
+#   surface0  #414559  surface1 #51576d  surface2 #626880
+#   overlay0  #737994  overlay1 #838ba7  overlay2 #949cbb
+#   subtext0  #a5adce  subtext1 #b5bfe2  text     #c6d0f5
+#   lavender  #babbf1  blue     #8caaee  sapphire #85c1dc
+#   sky       #99d1db  teal     #81c8be  green    #a6d189
+#   yellow    #e5c890  peach    #ef9f76  maroon   #ea999c
+#   red       #e78284  mauve    #ca9ee6  pink     #f4b8e4
+#   flamingo  #eebebe  rosewater #f2d5cf
+
+# ── General ──────────────────────────────────────────────────────────────────
+background     = '#303446'  # base
+border_fg      = '#51576d'  # surface1
+text_fg        = '#c6d0f5'  # text
+dimmed_text_fg = '#737994'  # overlay0
+
+# ── Input ─────────────────────────────────────────────────────────────────────
+input_text_fg   = '#ca9ee6'  # mauve
+result_count_fg = '#ef9f76'  # peach
+
+# ── Results ───────────────────────────────────────────────────────────────────
+result_name_fg        = '#8caaee'  # blue
+result_line_number_fg = '#e5c890'  # yellow
+result_value_fg       = '#c6d0f5'  # text
+selection_fg          = '#c6d0f5'  # text
+selection_bg          = '#414559'  # surface0
+match_fg              = '#e78284'  # red
+
+# ── Preview ───────────────────────────────────────────────────────────────────
+preview_title_fg = '#81c8be'  # teal
+
+# ── Mode pills ────────────────────────────────────────────────────────────────
+channel_mode_fg         = '#303446'  # base
+channel_mode_bg         = '#ca9ee6'  # mauve
+remote_control_mode_fg  = '#303446'  # base
+remote_control_mode_bg  = '#a6d189'  # green
+send_to_channel_mode_fg = '#99d1db'  # sky
