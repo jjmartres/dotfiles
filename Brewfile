@@ -36,6 +36,7 @@ brew "binutils"                                 # Collection of binary tools
 brew "btop"                                     # A monitor of resources
 brew "coreutils"                                # Basic command-line utilities (ls, cp, etc.)
 brew "curl"                                     # Tool to transfer data from/to a server
+brew "httpie"                                   # HTTPie is a command line HTTP client
 brew "dnstracer"                                # Traces DNS query paths
 brew "eza"                                      # ls replacement easy to use and simple to install
 brew "fastfetch"                                # Fast system information script
@@ -220,3 +221,5 @@ cask "hifidelity"                               # HiFiDeity is a free, open-sour
 cask "macos-fuse-t/homebrew-cask/fuse-t"        # Fuse-T is a cross-platform file system in userspace
 cask "macos-fuse-t/homebrew-cask/fuse-t-sshfs"  # Fuse-T is a cross-platform file system in userspace
 cask "lm-studio"                                # Run AI models, locally and privately.
+cask "transmission"                             # A fast, easy, and free BitTorrent client
+cask "musicbrainz-picard"                       # MusicBrain is a free, open-source, cross-platform application for analyzing and comparing your music collections.
