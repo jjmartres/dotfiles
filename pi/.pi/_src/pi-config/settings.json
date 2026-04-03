@@ -1,0 +1,68 @@
+{
+  "defaultProvider": "google",
+  "defaultModel": "gemini-2.5-pro",
+  "defaultThinkingLevel": "low",
+  "hideThinkingBlock": false,
+  "thinkingBudgets": {
+    "minimal": 1024,
+    "low": 4096,
+    "medium": 16000,
+    "high": 32768,
+    "xhigh": 64000
+  },
+
+  "theme": "catppuccin-mocha",
+
+  "quietStartup": false,
+  "collapseChangelog": true,
+  "doubleEscapeAction": "tree",
+  "editorPaddingX": 1,
+  "autocompleteMaxVisible": 8,
+  "showHardwareCursor": false,
+
+  "shellPath": "/usr/bin/fish",
+  "shellCommandPrefix": "source ~/.config/fish/config.fish 2>/dev/null; fish_add_path ~/.asdf/shims",
+
+  "compaction": {
+    "enabled": true,
+    "reserveTokens": 20000,
+    "keepRecentTokens": 30000
+  },
+
+  "retry": {
+    "enabled": true,
+    "maxRetries": 5,
+    "baseDelayMs": 2000,
+    "maxDelayMs": 60000
+  },
+
+  "steeringMode": "one-at-a-time",
+  "followUpMode": "one-at-a-time",
+  "transport": "sse",
+
+  "terminal": {
+    "showImages": true,
+    "clearOnShrink": false
+  },
+  "images": {
+    "autoResize": true,
+    "blockImages": false
+  },
+
+  "enabledModels": [
+    "gemini-2.5-pro*",
+    "gemini-2.5-flash*",
+    "claude-opus-4-*",
+    "claude-sonnet-4-*",
+    "claude-haiku-4-*"
+  ],
+
+  "markdown": {
+    "codeBlockIndent": "  "
+  },
+
+  "themes":  ["themes/"],
+  "prompts": ["prompts/"],
+  "skills":  ["skills/"],
+  "enableSkillCommands": true
+}
