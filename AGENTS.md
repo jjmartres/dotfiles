@@ -51,9 +51,9 @@ stow --simulate --dir=(pwd) --target=$HOME */
 ### Brewfile Management
 
 ```fish
-brew bundle --file ~/dotfiles/Brewfile   # install / reconcile
-brew install <pkg> && brew bundle dump --force               # add + record
-brew bundle cleanup --file ~/dotfiles/Brewfile               # audit
+brew bundle --file ~/dotfiles/Brewfile        # install / reconcile
+brew install <pkg> && brew bundle dump --force # add + record
+brew bundle cleanup --file ~/dotfiles/Brewfile # audit
 ```
 
 ---
@@ -73,6 +73,12 @@ Hooks (run on `pre-commit` and `pre-push` stages):
 - `check-yaml` — validates all YAML files
 - `end-of-file-fixer` — every file must end with a newline
 - `trailing-whitespace` — strips trailing whitespace
+
+### Fish Syntax Check (single file)
+
+```fish
+fish -n fish/.config/fish/functions/my_fn.fish
+```
 
 ### Full System Update
 
@@ -122,6 +128,22 @@ Never hardcode a theme name. All tools use Catppuccin; always reference `$DEFAUL
 - Exit codes: `return 0` success, `return 1` error
 - Long logic belongs in `functions/` — never inline in `conf.d/`
 
+### Fish — fzf Integration
+
+Critical patterns when calling fzf from Fish:
+
+- **Always use `fzf < file`**, never `cat file | fzf`. Piping closes stdin so fzf cannot open `/dev/tty` for its UI — the list appears empty.
+- **Tab delimiter**: Fish does not expand `\t` in strings. Use `set -l tab (printf '\t')` and pass as `--delimiter $tab` (two separate arguments — `--delimiter=$tab` embeds the tab into the flag string and breaks field splitting).
+- **`--nth` and `--with-nth` must not be used together** for the same field scope. `--with-nth` transforms the line before `--nth` splits it — if `--with-nth=2` renders a single-field string, `--nth=2` finds no tab and matches nothing.
+- **Multi-column picker pattern** (scope match to name, display name+remote, output path):
+  ```fish
+  # Cache format: name\tremote\tpath
+  printf '%-40s\t(%s)\t%s\n' "$parent/$bname" $remote $p
+  # fzf invocation:
+  set -l tab (printf '\t')
+  fzf --delimiter $tab --nth=1 --with-nth=1,2 < $cache_file | cut -f3
+  ```
+
 ### Fish — conf.d/ Load Order
 
 | Prefix | Purpose |
@@ -147,6 +169,7 @@ Completion files live in `fish/.config/fish/completions/<command>.fish`. Convent
 
 - Layouts live in `zellij/.config/zellij/layouts/<name>.kdl`
 - `default.kdl` is the fallback when no session-specific layout exists
+- Session creation: try `<session>.kdl`, fall back to `default.kdl`; declare layout variable before the `if`, reassign inside (scoping rule above)
 - Tab name icons: use Nerd Font glyphs (`󱃾`, ``, `󰆦`, `` etc.)
 - Suspended tabs: use `start_suspended=true` for heavy processes (k9s, nibbler)
 - Plain terminal tab: `tab name="  terminal" { pane }`

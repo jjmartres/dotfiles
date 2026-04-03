@@ -124,17 +124,22 @@ function code --description "Pick a repository under a path with fzf and open nv
         echo "$green✓$normal Session '$session_name' created"
     end
 
-    # Build the tab-delimited cache: "full_path\tbasename  (remote_url)"
+    # Build the tab-delimited cache with three fields:
+    #   field 1: parent/basename          — matched by fzf (--nth=1), never fuzzy-matches remote
+    #   field 2: (remote_url)             — displayed alongside field 1 but excluded from matching
+    #   field 3: full_path                — extracted via cut -f3 on select, never shown
+    # Sorted alphabetically by field 1.
     # This is the slow part (fd + git remote per repo) — results are cached.
     function __code_build_cache --no-scope-shadowing
         fd --hidden --no-ignore -t d --glob '.git' --prune $search_path \
-            -E '.terraform' -E 'Library' -E 'Application Support' \
+            -E '.terraform' -E 'Library' -E 'Application Support' -E '_*' \
             --exec dirname '{}' \
         | while read -l p
             set -l remote (git -C $p remote get-url origin 2>/dev/null)
             set -l bname (basename $p)
-            printf '%s\t%-40s (%s)\n' $p $bname $remote
-        end > $cache_file
+            set -l parent (basename (dirname $p))
+            printf '%-40s\t(%s)\t%s\n' "$parent/$bname" $remote $p
+        end | sort > $cache_file
     end
 
     if test "$force_refresh" = true
@@ -152,23 +157,30 @@ function code --description "Pick a repository under a path with fzf and open nv
     function __code_refresh_background --no-scope-shadowing
         fish -c "
             fd --hidden --no-ignore -t d --glob '.git' --prune '$search_path' \
-                -E '.terraform' -E 'Library' -E 'Application Support' \
+                -E '.terraform' -E 'Library' -E 'Application Support' -E '_*' \
                 --exec dirname '{}' \
             | while read -l p
                 set -l remote (git -C \$p remote get-url origin 2>/dev/null)
                 set -l bname (basename \$p)
-                printf '%s\t%-40s (%s)\n' \$p \$bname \$remote
-            end > '$cache_file'
+                set -l parent (basename (dirname \$p))
+                printf '%-40s\t(%s)\t%s\n' \"\$parent/\$bname\" \$remote \$p
+            end | sort > '$cache_file'
         " &>/dev/null &
         disown
     end
 
+    # Cache has three tab-separated fields: name\tremote\tpath
+    # --nth=1      → fuzzy matching scoped to field 1 (parent/basename) only
+    # --with-nth=1,2 → display fields 1 and 2 (name + remote), hide field 3 (path)
+    # cut -f3 on selection extracts the full path
+    set -l tab (printf '\t')
     set -l fzf_opts \
-        --delimiter="\t" \
-        --with-nth=2 \
+        --delimiter $tab \
+        --nth=1 \
+        --with-nth=1,2 \
         --prompt=" $session_name › " \
-        --header="Pick a repository  (cache: $cache_file)" \
-        --preview="cd (echo {} | cut -f1); git log -n 50 --oneline --decorate --graph --color=always" \
+        --header="Pick a repository" \
+        --preview="cd (echo {} | cut -f3); git log -n 50 --oneline --decorate --graph --color=always" \
         --preview-window="right:55%:wrap" \
         --reverse \
         --border=rounded \
@@ -186,18 +198,16 @@ function code --description "Pick a repository under a path with fzf and open nv
             --blocking \
             --name " Pick repository" \
             -- fish -c "
-                cat '$cache_file' \
-                    | fzf $fzf_opts --height=100% \
-                    | cut -f1 > '$tmp_file' 2>/dev/null
+                fzf $fzf_opts --height=100% < '$cache_file' \
+                    | cut -f3 > '$tmp_file' 2>/dev/null
             "
 
         set repo_path (string trim < $tmp_file)
         rm -f $tmp_file
     else
         # Outside Zellij: fzf uses /dev/tty directly
-        set repo_path (cat $cache_file \
-            | fzf $fzf_opts --height=80% \
-            | cut -f1)
+        set repo_path (fzf $fzf_opts --height=80% < $cache_file \
+            | cut -f3)
     end
 
     # Kick off background cache refresh (fire-and-forget)
