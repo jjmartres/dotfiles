@@ -171,6 +171,9 @@ brew "terrascan"                                # Static code analyzer for Infra
 brew "tfenv"                                    # Terraform version manager
 brew "tflint"                                   # Terraform linter
 brew "tfsec"                                    # Security scanner for Terraform code
+brew "colima"                                   # Container runtimes with minimal setup
+brew "docker"                                   # Docker command-line client
+brew "docker-compose"                           # Define and run multi-container applications
 
 ## Graphics
 brew "asciinema"                                # Record and share terminal sessions
@@ -188,17 +191,11 @@ brew "safedep/tap/vet"                          # Safely manage your dependencie
 
 ## AI
 brew "llmfit"                                   # Find which LLM models run on your hardware
-brew "models"                                   # Terminal dashboard for comparing AI model providers
-brew "ollama"                                   # Run large language models locally
 brew "opencode"                                 # AI coding agent built for the terminal
 brew "pi-coding-agent"                          # Pi coding agent
-
-## Fun
-brew "c2048"                                    # Terminal version of the 2048 game
-brew "fortune"                                  # Print a random, hopefully interesting, adage
+brew "mlx-lm"                                   # Run AI models locally and privately using MLX
 
 ## Cask Applications
-cask "bruno"                                    # Fully-offline API client
 cask "cyberduck"                                # FTP, SFTP, WebDAV, S3, Azure, Google Drive and more
 cask "dbeaver-community"                        # Database management tool
 cask "discord"                                  # Chat with your friends
@@ -207,7 +204,6 @@ cask "ghostty"                                  # Modern and customizable termin
 cask "gitkraken"                                # Cross-platform Git GUI client
 cask "gitkraken-cli"                            # Cross-platform Git CLI
 cask "hiddenbar"                                # Utility to hide menu bar icons
-cask "lm-studio"                                # Run AI models locally and privately
 cask "maccy"                                    # Clipboard manager
 cask "macos-fuse-t/homebrew-cask/fuse-t"        # FUSE for macOS in userspace
 cask "macos-fuse-t/homebrew-cask/fuse-t-sshfs"  # SSHFS via Fuse-T
@@ -216,4 +212,3 @@ cask "soulseek"                                 # P2P music sharing client
 cask "steam"                                    # Steam client
 cask "transmission"                             # Fast, easy, and free BitTorrent client
 cask "vlc"                                      # Cross-platform multimedia player
-cask "zed"                                      # Minimal code editor built for speed and AI collaboration
