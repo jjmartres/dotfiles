@@ -44,19 +44,6 @@ layout {
         }
     }
 
-    tab name="󱃾  k8s" start_suspended=true {
-        pane {
-            command "k9s"
-        }
-    }
-
-    tab name="󰚩  nibbler" start_suspended=true {
-        pane {
-            command "nibbler"
-            args "run"
-        }
-    }
-
     tab name="  terminal" {
         pane
     }
