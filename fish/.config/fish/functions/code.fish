@@ -29,6 +29,7 @@ function code --description "Pick a repository under a path with fzf and open nv
         echo "$bold Options:$normal"
         echo "  --refresh   Force rebuild of the repository cache before opening picker"
         echo "  --rm        Delete the named session (zellij delete-session --force)"
+        echo "  --resume    Reattach to an existing named session"
         echo ""
         echo "$bold Environment variables:$normal"
         echo "  CODE_CACHE_DIR        Cache directory  (current: $cache_dir)"
@@ -47,14 +48,15 @@ function code --description "Pick a repository under a path with fzf and open nv
         echo ""
         echo "$bold Examples:$normal"
         echo "  code                                      # uses env var defaults"
-        echo "  code fintecture ~/Repositories/fintecture"
-        echo "  code --refresh fintecture ~/Repositories/fintecture"
+  echo "  code work ~/Repositories/work"
+  echo "  code --refresh work ~/Repositories/work"
         return 0
     end
 
     # Parse flags
     set -l force_refresh false
     set -l force_rm false
+    set -l force_resume false
     set -l positional
     for arg in $argv
         switch $arg
@@ -62,6 +64,8 @@ function code --description "Pick a repository under a path with fzf and open nv
                 set force_refresh true
             case --rm
                 set force_rm true
+            case --resume
+                set force_resume true
             case '*'
                 set -a positional $arg
         end
@@ -74,6 +78,18 @@ function code --description "Pick a repository under a path with fzf and open nv
     if test -z "$session_name"
         echo "$red✗ Error: session name required (pass as argument or set \$CODE_DEFAULT_SESSION)$normal"
         return 1
+    end
+
+    # --resume: reattach to an existing session and exit early
+    if test "$force_resume" = true
+        if zellij list-sessions -s 2>/dev/null | string match -q -- $session_name
+            echo "$green→$normal Attaching to session '$bold$session_name$normal'"
+            zellij attach $session_name
+        else
+            echo "$yellow⚠  Session '$session_name' does not exist$normal"
+            return 1
+        end
+        return 0
     end
 
     # --rm: delete the session and exit early
