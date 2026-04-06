@@ -26,6 +26,7 @@ return {
         ["<leader>gh"] = { name = "+hunks" },
         ["<leader>q"] = { name = "+quit/session" },
         ["<leader>s"] = { name = "+search" },
+        ["<leader>t"] = { name = "+terminal" },
         ["<leader>u"] = { name = "+ui" },
         ["<leader>w"] = { name = "+windows" },
         ["<leader>x"] = { name = "+diagnostics/quickfix" },
@@ -34,6 +35,12 @@ return {
       opts.spec = opts.spec or {}
       vim.list_extend(opts.spec, {
         { "<leader>m", desc = "Zen Mode", icon = { icon = "󰚀", color = "purple" } },
+
+        { "<leader>t", group = "terminal", icon = { icon = "", color = "cyan" } },
+        { "<leader>tt", desc = "Toggle Terminal", icon = { icon = "", color = "cyan" } },
+        { "<leader>tf", desc = "Float Terminal", icon = { icon = "󱂬", color = "purple" } },
+        { "<leader>th", desc = "Horizontal Terminal", icon = { icon = "󰤽", color = "blue" } },
+        { "<leader>tv", desc = "Vertical Terminal", icon = { icon = "󰤼", color = "green" } },
 
         { "<leader>z", group = "zettelkasten", icon = { icon = "󱓷", color = "azure" } },
 
