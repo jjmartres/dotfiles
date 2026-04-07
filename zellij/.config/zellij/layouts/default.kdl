@@ -3,22 +3,10 @@ layout {
         children
         pane size=1 borderless=true {
             plugin location="file:~/.config/zellij/plugins/zjstatus.wasm" {
-                format_left   "#[fg=#a6da95,bold]󰆦 #[fg=#c6a0f6,bold]{session} #[fg=#cad3f5]- {mode}"
+                format_left   "#[fg=#a6da95,bold]󰲁 #[fg=#c6a0f6,bold]{session} #[fg=#cad3f5]- {mode}"
                 format_center "{tabs}"
-                format_right  "#[fg=#f5a97f]{command_cpu}#[fg=#5b6078] - #[fg=#91d7e3]{command_ram} #[fg=#5b6078] - #[fg=#8aadf4,bold]{datetime}"
+                format_right  "#[fg=#8aadf4,bold]{datetime}"
                 format_space  ""
-
-                // CPU usage command
-                command_cpu_command     "cpu.fish"
-                command_cpu_format      "  {stdout}%"
-                command_cpu_interval    "30"
-                command_cpu_rendermode  "static"
-
-                // RAM usage command
-                command_ram_command     "ram.fish"
-                command_ram_format      "  {stdout}"
-                command_ram_interval    "60"
-                command_ram_rendermode  "static"
 
                 border_enabled  "false"
                 hide_frame_for_single_pane "true"
@@ -46,6 +34,12 @@ layout {
 
     tab name="  terminal" {
         pane
+    }
+
+    tab name="  top" start_suspended=true {
+       pane {
+         command "btop"
+       }
     }
 
 }

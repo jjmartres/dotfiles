@@ -194,7 +194,7 @@ brew "safedep/tap/vet"                          # Safely manage your dependencie
 brew "llmfit"                                   # Find which LLM models run on your hardware
 brew "opencode"                                 # AI coding agent built for the terminal
 brew "pi-coding-agent"                          # Pi coding agent
-brew "mlx-lm"                                   # Run AI models locally and privately using MLX
+brew "mlx-lm"                                   # Language model server
 
 ## Cask Applications
 cask "cyberduck"                                # FTP, SFTP, WebDAV, S3, Azure, Google Drive and more
