@@ -11,6 +11,7 @@ tap "fairwindsops/tap"                          # Formulae for Homebrew
 tap "FelixKratz/formulae"                       # Formulae for Homebrew
 tap "gromgit/brewtils"                          # Formulae for Homebrew
 tap "hashicorp/tap"                             # Tap for Hashicorp tools
+tap "jundot/omlx", "https://github.com/jundot/omlx"       # Tap for omlx
 tap "koekeishiya/formulae"                      # Formulae for Homebrew
 tap "lusingander/tap"                           # Formulae for Homebrew
 tap "macos-fuse-t/homebrew-cask"                # Formulae for Homebrew
@@ -124,6 +125,7 @@ brew "poetry"                                   # Python dependency management a
 brew "prettier"                                 # Opinionated code formatter
 brew "prettierd"                                # Opinionated code formatter (daemon)
 brew "pydantic"                                 # Data validation and settings management using Python type hints
+brew "python@3.11"                              # Required dependency for omlx
 brew "rust"                                     # Systems programming language
 brew "tree-sitter-cli"                          # CLI tool for managing Tree-sitter parsers
 brew "uv"                                       # Fast Python package and project manager
@@ -194,7 +196,7 @@ brew "safedep/tap/vet"                          # Safely manage your dependencie
 brew "llmfit"                                   # Find which LLM models run on your hardware
 brew "opencode"                                 # AI coding agent built for the terminal
 brew "pi-coding-agent"                          # Pi coding agent
-brew "mlx-lm"                                   # Language model server
+brew "omlx"                                     # Run AI models locally and privately using MLX
 
 ## Cask Applications
 cask "cyberduck"                                # FTP, SFTP, WebDAV, S3, Azure, Google Drive and more
@@ -211,5 +213,4 @@ cask "macos-fuse-t/homebrew-cask/fuse-t-sshfs"  # SSHFS via Fuse-T
 cask "musicbrainz-picard"                       # Music tagger powered by MusicBrainz
 cask "soulseek"                                 # P2P music sharing client
 cask "steam"                                    # Steam client
-cask "transmission"                             # Fast, easy, and free BitTorrent client
 cask "vlc"                                      # Cross-platform multimedia player

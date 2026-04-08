@@ -1,5 +1,5 @@
-function code --description "Pick a repository under a path with fzf and open nvim in a named zellij tab"
-    # Usage: code [--refresh] <session> <path>
+function code --description "Pick a repository under a path with fzf and open nvim in project directory"
+    # Usage: code [--refresh] [path]
 
     set -l blue (set_color blue)
     set -l green (set_color green)
@@ -18,91 +18,48 @@ function code --description "Pick a repository under a path with fzf and open nv
         echo "$bold code - There are many IDE, but this one is mine.         $normal"
         echo "$bold$cyan━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$normal"
         echo ""
-        echo "Usage: code [--refresh] [session] [path]"
+        echo "Usage: code [--refresh] [path]"
         echo ""
         echo "$bold Arguments:$normal"
-        echo "  session     Zellij session name to open the tab in"
-        echo "              (default: \$CODE_DEFAULT_SESSION)"
         echo "  path        Root path to search for git repositories"
         echo "              (default: \$CODE_DEFAULT_PATH)"
         echo ""
         echo "$bold Options:$normal"
         echo "  --refresh   Force rebuild of the repository cache before opening picker"
-        echo "  --rm        Delete the named session (zellij delete-session --force)"
-        echo "  --resume    Reattach to an existing named session"
         echo ""
         echo "$bold Environment variables:$normal"
         echo "  CODE_CACHE_DIR        Cache directory  (current: $cache_dir)"
-        echo "  CODE_DEFAULT_SESSION  Default session  (current: $CODE_DEFAULT_SESSION)"
         echo "  CODE_DEFAULT_PATH     Default path     (current: $CODE_DEFAULT_PATH)"
         echo ""
         echo "$bold Behaviour:$normal"
-        echo "  • Repository list is cached in \$CODE_CACHE_DIR/<session>"
+        echo "  • Repository list is cached in \$CODE_CACHE_DIR/repositories"
         echo "  • Cache is served instantly; a background rebuild runs after each use"
         echo "  • --refresh rebuilds the cache synchronously before showing the picker"
-        echo "  • Each entry shows: basename  (git remote url)"
-        echo "  • Inside Zellij: picker runs in a floating pane"
-        echo "  • Outside Zellij: picker runs inline via fzf"
-        echo "  • If <session> does not exist: creates it using '<session>' as layout name"
-        echo "  • Tab name = repository basename; focuses existing tab or creates a new one"
+        echo "  • Each entry shows: parent/basename  (git remote url)"
+        echo "  • Picker runs inline via fzf with git log preview"
+        echo "  • Opens selected repository in Neovim"
         echo ""
         echo "$bold Examples:$normal"
-        echo "  code                                      # uses env var defaults"
-  echo "  code work ~/Repositories/work"
-  echo "  code --refresh work ~/Repositories/work"
+        echo "  code                              # uses \$CODE_DEFAULT_PATH"
+        echo "  code ~/Repositories/work          # search specific path"
+        echo "  code --refresh ~/Repositories     # rebuild cache then pick"
         return 0
     end
 
     # Parse flags
     set -l force_refresh false
-    set -l force_rm false
-    set -l force_resume false
     set -l positional
     for arg in $argv
         switch $arg
             case --refresh
                 set force_refresh true
-            case --rm
-                set force_rm true
-            case --resume
-                set force_resume true
             case '*'
                 set -a positional $arg
         end
     end
 
     # Apply positional args, falling back to env var defaults
-    set -l session_name (test (count $positional) -ge 1; and echo $positional[1]; or echo $CODE_DEFAULT_SESSION)
-    set -l search_path  (test (count $positional) -ge 2; and echo $positional[2]; or echo $CODE_DEFAULT_PATH)
-
-    if test -z "$session_name"
-        echo "$red✗ Error: session name required (pass as argument or set \$CODE_DEFAULT_SESSION)$normal"
-        return 1
-    end
-
-    # --resume: reattach to an existing session and exit early
-    if test "$force_resume" = true
-        if zellij list-sessions -s 2>/dev/null | string match -q -- $session_name
-            echo "$green→$normal Attaching to session '$bold$session_name$normal'"
-            zellij attach $session_name
-        else
-            echo "$yellow⚠  Session '$session_name' does not exist$normal"
-            return 1
-        end
-        return 0
-    end
-
-    # --rm: delete the session and exit early
-    if test "$force_rm" = true
-        if zellij list-sessions -s 2>/dev/null | string match -q -- $session_name
-            echo "$red→$normal Deleting session '$bold$session_name$normal'"
-            zellij delete-session $session_name --force
-            echo "$green✓$normal Session '$session_name' deleted"
-        else
-            echo "$yellow⚠  Session '$session_name' does not exist$normal"
-        end
-        return 0
-    end
+    set -l search_path (test (count $positional) -ge 1; and echo $positional[1]; or echo $CODE_DEFAULT_PATH)
 
     if test -z "$search_path"
         echo "$red✗ Error: path required (pass as argument or set \$CODE_DEFAULT_PATH)$normal"
@@ -117,28 +74,9 @@ function code --description "Pick a repository under a path with fzf and open nv
         return 1
     end
 
-    # Cache file: one file per session name, stored under cache_dir
+    # Cache file: single file for all repositories
     mkdir -p $cache_dir
-    set -l cache_file "$cache_dir/$session_name"
-
-    # Ensure the target session exists — create it with a matching layout if not
-    if not zellij list-sessions -s 2>/dev/null | string match -q -- $session_name
-        set -l layout_dir ~/.config/zellij/layouts
-        set -l layout default
-        if test -f "$layout_dir/$session_name.kdl"
-            set layout $session_name
-        else
-            echo "$yellow⚠  No layout '$session_name.kdl' found — falling back to 'default'$normal"
-        end
-        echo "$blue→$normal Creating session '$session_name' with layout '$layout'$normal"
-        zellij --session $session_name --new-session-with-layout $layout 2>/dev/null &
-        sleep 1
-        if not zellij list-sessions -s 2>/dev/null | string match -q -- $session_name
-            echo "$red✗ Error: could not create session '$session_name'$normal"
-            return 1
-        end
-        echo "$green✓$normal Session '$session_name' created"
-    end
+    set -l cache_file "$cache_dir/repositories"
 
     # Build the tab-delimited cache with three fields:
     #   field 1: parent/basename          — matched by fzf (--nth=1), never fuzzy-matches remote
@@ -194,7 +132,7 @@ function code --description "Pick a repository under a path with fzf and open nv
         --delimiter $tab \
         --nth=1 \
         --with-nth=1,2 \
-        --prompt=" $session_name › " \
+        --prompt=" code › " \
         --header="Pick a repository" \
         --preview="cd (echo {} | cut -f3); git log -n 50 --oneline --decorate --graph --color=always" \
         --preview-window="right:55%:wrap" \
@@ -202,29 +140,8 @@ function code --description "Pick a repository under a path with fzf and open nv
         --border=rounded \
         --color="header:italic:cyan,prompt:bold:green"
 
-    set -l repo_path ""
-
-    if set -q ZELLIJ
-        # Inside Zellij: run fzf in a floating pane, write selection to tempfile
-        set -l tmp_file (mktemp)
-
-        zellij run \
-            --floating \
-            --close-on-exit \
-            --blocking \
-            --name " Pick repository" \
-            -- fish -c "
-                fzf $fzf_opts --height=100% < '$cache_file' \
-                    | cut -f3 > '$tmp_file' 2>/dev/null
-            "
-
-        set repo_path (string trim < $tmp_file)
-        rm -f $tmp_file
-    else
-        # Outside Zellij: fzf uses /dev/tty directly
-        set repo_path (fzf $fzf_opts --height=80% < $cache_file \
-            | cut -f3)
-    end
+    # Run fzf picker
+    set -l repo_path (fzf $fzf_opts --height=80% < $cache_file | cut -f3)
 
     # Kick off background cache refresh (fire-and-forget)
     __code_refresh_background
@@ -235,40 +152,48 @@ function code --description "Pick a repository under a path with fzf and open nv
     end
 
     set -l repo_name (basename $repo_path)
-    set -l tab_name "󰆦 $repo_name"
 
-    echo "$cyan→$normal Session:    $bold$session_name$normal"
     echo "$cyan→$normal Repository: $bold$repo_name$normal"
     echo "$cyan→$normal Path:       $repo_path"
 
-    # Check whether the tab already exists in the target session
-    set -l existing_tab (env ZELLIJ_SESSION_NAME=$session_name zellij action list-tabs -j 2>/dev/null \
-        | jq -r '.[].name' 2>/dev/null \
-        | string match -e -- $tab_name)
+    # Check for backgrounded nvim instance (any nvim job that's stopped)
+    set -l nvim_job (jobs -c | string match -r '^\d+.*nvim' | string match -r '^\d+' | head -n1)
 
-    if test -n "$existing_tab"
-        echo "$green✓$normal Tab '$tab_name' already exists — focusing it"
-        env ZELLIJ_SESSION_NAME=$session_name zellij action go-to-tab-name $tab_name
+    if test -n "$nvim_job"
+        echo "$green→$normal Found backgrounded Neovim (job $nvim_job) — bringing to foreground"
+        fg %$nvim_job
+    else if set -q GHOSTTY_RESOURCES_DIR
+        # Inside Ghostty: open nvim in a new tab using AppleScript
+        echo "$green→$normal Opening in new Ghostty tab"
+
+        # Save current clipboard
+        set -l saved_clipboard (pbpaste)
+
+        # Build the full command with dynamic title setting using Fish syntax
+        # Clear the screen first to hide the pasted command, then execute
+        # After nvim exits (quit or background), exit the shell to close the tab
+        # Format: basename (branch: branch-name, head: commit-hash)
+        set -l title_cmd 'set -l branch (git branch --show-current 2>/dev/null; or echo "detached"); set -l commit (git rev-parse --short HEAD 2>/dev/null; or echo "no-commit"); printf "\\e]2;  %s (branch: %s, head: %s)\\a" "'"$repo_name"'" $branch $commit'
+        set -l full_cmd "clear; cd $repo_path; and $title_cmd; and nvim .; exit"
+
+        # Copy command to clipboard
+        printf '%s' $full_cmd | pbcopy
+
+        # Send Cmd+T to create new tab, paste command, and execute
+        osascript -e 'tell application "System Events" to tell process "ghostty"
+            keystroke "t" using command down
+            delay 0.2
+            keystroke "v" using command down
+            delay 0.1
+            keystroke return
+        end tell' 2>/dev/null
+
+        # Restore clipboard after a short delay
+        fish -c "sleep 0.5; printf '%s' (string escape -- '$saved_clipboard') | pbcopy" &>/dev/null &
+        disown
     else
-        echo "$blue→$normal Creating new tab '$tab_name' with nvim"
-        env ZELLIJ_SESSION_NAME=$session_name \
-            zellij action new-tab \
-            --name $tab_name \
-            --cwd $repo_path \
-            -- nvim .
-
-        # Move the new tab to position 0 (before k8s).
-        # It lands at the last position; query its index then move left that many times.
-        set -l tab_pos (env ZELLIJ_SESSION_NAME=$session_name zellij action list-tabs -j 2>/dev/null \
-            | jq -r ".[] | select(.name == \"$tab_name\") | .position")
-
-        for i in (seq 1 $tab_pos)
-            env ZELLIJ_SESSION_NAME=$session_name zellij action move-tab left
-        end
-    end
-
-    # If called from outside Zellij, attach to the session so the user lands in it
-    if not set -q ZELLIJ
-        zellij attach $session_name
+        # Not in Ghostty: open nvim in current terminal
+        echo "$green→$normal Opening in Neovim"
+        cd $repo_path; and nvim .
     end
 end

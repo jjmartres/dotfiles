@@ -1,8 +1,11 @@
 return {
   "nvim-lualine/lualine.nvim",
   opts = function(_, opts)
-    -- Remove the clock from lualine (time is already shown in the Zellij session)
-    opts.sections.lualine_z = {}
+    opts.sections.lualine_z = {
+      function()
+        return os.date("%a %d %b %H:%M")
+      end,
+    }
     return opts
   end,
 }
