@@ -86,14 +86,14 @@ function code --description "Pick a repository under a path with fzf and open nv
     # This is the slow part (fd + git remote per repo) — results are cached.
     function __code_build_cache --no-scope-shadowing
         fd --hidden --no-ignore -t d --glob '.git' --prune $search_path \
-            -E '.terraform' -E 'Library' -E 'Application Support' -E '_*' \
+            -E '.terraform' -E Library -E 'Application Support' -E '_*' \
             --exec dirname '{}' \
-        | while read -l p
+            | while read -l p
             set -l remote (git -C $p remote get-url origin 2>/dev/null)
             set -l bname (basename $p)
             set -l parent (basename (dirname $p))
             printf '%-40s\t(%s)\t%s\n' "$parent/$bname" $remote $p
-        end | sort > $cache_file
+        end | sort >$cache_file
     end
 
     if test "$force_refresh" = true
@@ -163,34 +163,61 @@ function code --description "Pick a repository under a path with fzf and open nv
         echo "$green→$normal Found backgrounded Neovim (job $nvim_job) — bringing to foreground"
         fg %$nvim_job
     else if set -q GHOSTTY_RESOURCES_DIR
-        # Inside Ghostty: open nvim in a new tab using AppleScript
-        echo "$green→$normal Opening in new Ghostty tab"
+        # Inside Ghostty: check if a tab for this repo already exists
+        set -l existing_tabs (osascript -e 'tell application "Ghostty" to get name of tabs of window 1' 2>/dev/null)
 
-        # Save current clipboard
-        set -l saved_clipboard (pbpaste)
+        # Check if any tab contains this repo name (match pattern: "󰬊 repo-name (branch:")
+        set -l tab_exists false
+        set -l tab_index 1
 
-        # Build the full command with dynamic title setting using Fish syntax
-        # Clear the screen first to hide the pasted command, then execute
-        # After nvim exits (quit or background), exit the shell to close the tab
-        # Format: basename (branch: branch-name, head: commit-hash)
-        set -l title_cmd 'set -l branch (git branch --show-current 2>/dev/null; or echo "detached"); set -l commit (git rev-parse --short HEAD 2>/dev/null; or echo "no-commit"); printf "\\e]2;  %s (branch: %s, head: %s)\\a" "'"$repo_name"'" $branch $commit'
-        set -l full_cmd "clear; cd $repo_path; and $title_cmd; and nvim .; exit"
+        if test -n "$existing_tabs"
+            for tab_name in (string split ',' -- $existing_tabs)
+                set tab_name (string trim -- $tab_name)
+                # Match if tab name starts with "󰬊 $repo_name ("
+                if string match -q "󰬊 $repo_name (*" -- $tab_name
+                    set tab_exists true
+                    break
+                end
+                set tab_index (math $tab_index + 1)
+            end
+        end
 
-        # Copy command to clipboard
-        printf '%s' $full_cmd | pbcopy
+        if test "$tab_exists" = true
+            echo "$green→$normal Tab for '$bold$repo_name$normal' already exists — switching to tab $tab_index"
+            # Use Cmd+<number> to switch to the tab (Cmd+1 for first tab, etc.)
+            osascript -e "tell application \"System Events\" to tell process \"ghostty\"
+                keystroke \"$tab_index\" using command down
+            end tell" 2>/dev/null
+        else
+            # No existing tab: create a new one
+            echo "$green→$normal Opening in new Ghostty tab"
 
-        # Send Cmd+T to create new tab, paste command, and execute
-        osascript -e 'tell application "System Events" to tell process "ghostty"
-            keystroke "t" using command down
-            delay 0.2
-            keystroke "v" using command down
-            delay 0.1
-            keystroke return
-        end tell' 2>/dev/null
+            # Save current clipboard
+            set -l saved_clipboard (pbpaste)
 
-        # Restore clipboard after a short delay
-        fish -c "sleep 0.5; printf '%s' (string escape -- '$saved_clipboard') | pbcopy" &>/dev/null &
-        disown
+            # Build the full command with dynamic title setting using Fish syntax
+            # Clear the screen first to hide the pasted command, then execute
+            # After nvim exits (quit or background), exit the shell to close the tab
+            # Format: 󰬊 basename (branch: branch-name, head: commit-hash)
+            set -l title_cmd 'set -l branch (git branch --show-current 2>/dev/null; or echo "detached"); set -l commit (git rev-parse --short HEAD 2>/dev/null; or echo "no-commit"); printf "\\e]2;󰬊 %s (branch: %s, head: %s)\\a" "'"$repo_name"'" $branch $commit'
+            set -l full_cmd "clear; cd $repo_path; and $title_cmd; and nvim .; exit"
+
+            # Copy command to clipboard
+            printf '%s' $full_cmd | pbcopy
+
+            # Send Cmd+T to create new tab, paste command, and execute
+            osascript -e 'tell application "System Events" to tell process "ghostty"
+                keystroke "t" using command down
+                delay 0.2
+                keystroke "v" using command down
+                delay 0.1
+                keystroke return
+            end tell' 2>/dev/null
+
+            # Restore clipboard after a short delay
+            fish -c "sleep 0.5; printf '%s' (string escape -- '$saved_clipboard') | pbcopy" &>/dev/null &
+            disown
+        end
     else
         # Not in Ghostty: open nvim in current terminal
         echo "$green→$normal Opening in Neovim"
