@@ -20,6 +20,7 @@ tap "rvarunrathod/tap"                          # Formulae for Homebrew
 tap "safedep/tap"                               # Tap for safedep
 tap "steipete/tap"                              # Formulae for Homebrew
 tap "vladkens/tap"                              # Formulae for Homebrew
+tap "anomalyco/tap"                             # Formulae for Homebrew
 
 ## Fonts
 cask "font-iosevka-nerd-font"
@@ -194,7 +195,7 @@ brew "safedep/tap/vet"                          # Safely manage your dependencie
 
 ## AI
 brew "llmfit"                                   # Find which LLM models run on your hardware
-brew "opencode"                                 # AI coding agent built for the terminal
+brew "anomalyco/tap/opencode"                   # AI coding agent built for the terminal
 brew "pi-coding-agent"                          # Pi coding agent
 brew "omlx"                                     # Run AI models locally and privately using MLX
 
