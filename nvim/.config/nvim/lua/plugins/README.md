@@ -10,6 +10,8 @@ LazyVim-based configuration. Each file in this directory is auto-loaded by Lazy.
 |--------|------|-------------|
 | `lewis6991/gitsigns.nvim` | `git.lua` | Signs in the gutter for added/changed/deleted lines. Stage, reset, preview, and blame individual hunks without leaving the buffer. `<leader>gh*` keymaps, `ih` text object for hunk selection, `<leader>uG` to toggle signs. |
 | `sindrets/diffview.nvim` | `diff.lua` | Side-by-side diff view and full git file history browser. `<leader>gd` open, `<leader>gD` close, `<leader>gf` current file history, `<leader>gF` branch history. |
+| `harrisoncramer/gitlab.nvim` | `forge.lua` | GitLab MR review, discussions, approvals, pipeline status, and merge — all inside Neovim. Requires a GitLab personal access token. `<leader>gl*` keymaps. |
+| `pwntester/octo.nvim` | `forge.lua` | GitHub PR and issue management, inline code review, comments, and approvals via Telescope. Requires a GitHub personal access token. `<leader>go*` keymaps. |
 
 ---
 

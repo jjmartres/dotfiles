@@ -24,6 +24,7 @@ return {
         ["<leader>f"] = { name = "+file/find" },
         ["<leader>g"] = { name = "+git" },
         ["<leader>gh"] = { name = "+hunks" },
+
         ["<leader>q"] = { name = "+quit/session" },
         ["<leader>s"] = { name = "+search" },
         ["<leader>t"] = { name = "+terminal" },
@@ -35,6 +36,11 @@ return {
       opts.spec = opts.spec or {}
       vim.list_extend(opts.spec, {
         { "<leader>m", desc = "Zen Mode", icon = { icon = "󰚀", color = "purple" } },
+
+        { "<leader>gl", group = "gitlab", icon = { icon = "", color = "orange" } },
+        { "<leader>gla", group = "assignee", icon = { icon = "", color = "orange" } },
+        { "<leader>glr", group = "reviewer", icon = { icon = "", color = "orange" } },
+        { "<leader>go", group = "github", icon = { icon = "", color = "purple" } },
 
         { "<leader>t", group = "terminal", icon = { icon = "", color = "cyan" } },
         { "<leader>tt", desc = "Toggle Terminal", icon = { icon = "", color = "cyan" } },

@@ -154,7 +154,7 @@ return {
           { section = "startup" },
         },
       },
-      lazzygit = { enabled = true },
+      lazygit = { enabled = true },
       terminal = { enabled = true },
       zen = {
         enabled = true,
@@ -172,12 +172,18 @@ return {
     },
     keys = {
       {
-        "<leader>z",
+        "<leader>gg",
         function()
-          Snacks.zen()
+          Snacks.lazygit()
         end,
-        desc = "Toggle Zen Mode",
-        mode = "n",
+        desc = "Lazygit",
+      },
+      {
+        "<leader>gb",
+        function()
+          Snacks.lazygit.log_file()
+        end,
+        desc = "Git File Log",
       },
       {
         "<c-/>",
