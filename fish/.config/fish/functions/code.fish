@@ -30,9 +30,10 @@ function code --description "Pick a repository under a path with fzf and open nv
         echo "$bold Environment variables:$normal"
         echo "  CODE_CACHE_DIR        Cache directory  (current: $cache_dir)"
         echo "  CODE_DEFAULT_PATH     Default path     (current: $CODE_DEFAULT_PATH)"
+        echo "  CODE_DEFAULT_SESSION  Cache file name  (current: $CODE_DEFAULT_SESSION)"
         echo ""
         echo "$bold Behaviour:$normal"
-        echo "  • Repository list is cached in \$CODE_CACHE_DIR/repositories"
+        echo "  • Repository list is cached in \$CODE_CACHE_DIR/\$CODE_DEFAULT_SESSION"
         echo "  • Cache is served instantly; a background rebuild runs after each use"
         echo "  • --refresh rebuilds the cache synchronously before showing the picker"
         echo "  • Each entry shows: parent/basename  (git remote url)"
@@ -74,15 +75,20 @@ function code --description "Pick a repository under a path with fzf and open nv
         return 1
     end
 
-    # Cache file: single file for all repositories
+    # Cache files: named by CODE_DEFAULT_SESSION, falling back to "repositories"
+    #   $cache_file      — tab-delimited (name\tremote\tpath), read by fzf
+    #   $cache_file.nvim — one absolute path per line, read by Neovim via NVIM_PROJECTS_FILE
     mkdir -p $cache_dir
-    set -l cache_file "$cache_dir/repositories"
+    set -l session_name (test -n "$CODE_DEFAULT_SESSION"; and echo $CODE_DEFAULT_SESSION; or echo "repositories")
+    set -l cache_file "$cache_dir/$session_name"
+    set -l nvim_cache_file "$cache_file.nvim"
 
     # Build the tab-delimited cache with three fields:
     #   field 1: parent/basename          — matched by fzf (--nth=1), never fuzzy-matches remote
     #   field 2: (remote_url)             — displayed alongside field 1 but excluded from matching
     #   field 3: full_path                — extracted via cut -f3 on select, never shown
     # Sorted alphabetically by field 1.
+    # Also writes $cache_file.nvim: field 3 (full path) only, one per line, for Neovim.
     # This is the slow part (fd + git remote per repo) — results are cached.
     function __code_build_cache --no-scope-shadowing
         fd --hidden --no-ignore -t d --glob '.git' --prune $search_path \
@@ -94,6 +100,7 @@ function code --description "Pick a repository under a path with fzf and open nv
             set -l parent (basename (dirname $p))
             printf '%-40s\t(%s)\t%s\n' "$parent/$bname" $remote $p
         end | sort >$cache_file
+        cut -f3 $cache_file >$nvim_cache_file
     end
 
     if test "$force_refresh" = true
@@ -106,7 +113,7 @@ function code --description "Pick a repository under a path with fzf and open nv
         echo "$green✓$normal Cache ready"
     end
 
-    # After serving the picker, rebuild cache in background so next call is fresh.
+    # After serving the picker, rebuild both cache files in background so next call is fresh.
     # We do this via a fish -c detached process — no output, no blocking.
     function __code_refresh_background --no-scope-shadowing
         fish -c "
@@ -119,6 +126,7 @@ function code --description "Pick a repository under a path with fzf and open nv
                 set -l parent (basename (dirname \$p))
                 printf '%-40s\t(%s)\t%s\n' \"\$parent/\$bname\" \$remote \$p
             end | sort > '$cache_file'
+            cut -f3 '$cache_file' > '$nvim_cache_file'
         " &>/dev/null &
         disown
     end
