@@ -2,13 +2,13 @@
 
 ## Identity
 
-You are assisting me. This is a personal dotfiles repository managed with **GNU Stow**.
+Personal dotfiles repository managed with **GNU Stow**.
 
 ---
 
 ## Repository Structure
 
-Every top-level directory is a **Stow package**. Its internal layout mirrors `$HOME`, so `stow */` creates symlinks from each package into `$HOME`.
+Every top-level directory is a **Stow package**. Its internal layout mirrors `$HOME`, so `stow */` symlinks each package into `$HOME`.
 
 ```
 dotfiles/
@@ -42,7 +42,7 @@ stow --dir=(pwd) --target=$HOME */
 
 # Restow a single package after changes
 stow -R fish
-stow -R zellij
+stow -R nvim
 
 # Simulate before deploying (dry-run)
 stow --simulate --dir=(pwd) --target=$HOME */
@@ -51,9 +51,9 @@ stow --simulate --dir=(pwd) --target=$HOME */
 ### Brewfile Management
 
 ```fish
-brew bundle --file ~/dotfiles/Brewfile        # install / reconcile
-brew install <pkg> && brew bundle dump --force # add + record
-brew bundle cleanup --file ~/dotfiles/Brewfile # audit
+brew bundle --file ~/dotfiles/Brewfile         # install / reconcile
+brew install <pkg> && brew bundle dump --force  # add + record
+brew bundle cleanup --file ~/dotfiles/Brewfile  # audit
 ```
 
 ---
@@ -63,10 +63,7 @@ brew bundle cleanup --file ~/dotfiles/Brewfile # audit
 No automated tests. Validation is pre-commit hooks + manual stow simulation.
 
 ```fish
-pre-commit run --all-files          # run all hooks on every file
-pre-commit run check-yaml --all-files
-pre-commit run trailing-whitespace --all-files
-pre-commit run end-of-file-fixer --all-files
+pre-commit run --all-files   # run all hooks on every file
 ```
 
 Hooks (run on `pre-commit` and `pre-push` stages):
@@ -94,7 +91,7 @@ update   # nvim plugins → Mason → CLT → asdf → brew bundle → brew upgr
 - **Always use Fish syntax** — no bashisms
 - **Forbidden**: `export`, `source`, `$()` subshells (use `(cmd)`), `[[`, `&&`/`||` (use `; and`/`; or`)
 - **Prompt**: Starship — theme driven by `$DEFAULT_THEME`
-- **Multiplexer**: Zellij (default shell = fish)
+- **Terminal**: Ghostty (primary); Zellij still configured but not the default session runner
 - **Version manager**: asdf (`~/.asdf/shims`)
 
 ### Theme System
@@ -174,6 +171,13 @@ Completion files live in `fish/.config/fish/completions/<command>.fish`. Convent
 - Suspended tabs: use `start_suspended=true` for heavy processes (k9s, nibbler)
 - Plain terminal tab: `tab name="  terminal" { pane }`
 
+### Neovim Plugins
+
+- Plugin files live in `nvim/.config/nvim/lua/plugins/`
+- **Name files by usage, not by plugin name**: `git.lua`, `completion.lua`, `formatting.lua`, not `gitsigns.lua`, `blink.lua`, `conform.lua`
+- Each file returns a Lazy.nvim spec table; multiple specs in one file are merged by plugin name
+- See `nvim/.config/nvim/lua/plugins/README.md` for the full plugin inventory
+
 ### Brewfile
 
 - Groups separated by `## Category` comments
@@ -217,15 +221,20 @@ Default branch: `develop`. Push with `--force-with-lease`, never `--force`.
 
 ---
 
-## Environment Variables (code function)
+## Environment Variables
 
-The `code` function reads these at runtime; set them in `conf.d/101_secrets_exports.fish`:
+### `code` function — set in `conf.d/101_secrets_exports.fish`
 
 | Variable | Purpose | Default |
 |----------|---------|---------|
-| `CODE_CACHE_DIR` | Repository list cache location | `~/.fish_code_function_cache` |
-| `CODE_DEFAULT_SESSION` | Default Zellij session name | _(empty)_ |
-| `CODE_DEFAULT_PATH` | Default repository search root | _(empty)_ |
+| `CODE_CACHE_DIR` | Cache directory for repo list | `~/.fish_code_function_cache` |
+| `CODE_DEFAULT_SESSION` | Cache filename stem (e.g. `fintecture`) | _(empty → falls back to `repositories`)_ |
+| `CODE_DEFAULT_PATH` | Root path to search for git repos | _(empty)_ |
+| `NVIM_PROJECTS_FILE` | Neovim project list — set to `$CODE_CACHE_DIR/$CODE_DEFAULT_SESSION.nvim` | _(empty)_ |
+
+**Cache file flow**: `code --refresh` writes two files:
+- `$CODE_CACHE_DIR/$CODE_DEFAULT_SESSION` — tab-delimited (`name\tremote\tpath`), read by fzf
+- `$CODE_CACHE_DIR/$CODE_DEFAULT_SESSION.nvim` — one absolute path per line, read by Neovim via `NVIM_PROJECTS_FILE`
 
 ---
 
@@ -235,7 +244,7 @@ Never commit — gitignored by pattern:
 
 | File / Pattern | Contents |
 |----------------|----------|
-| `fish/conf.d/101_secrets_exports.fish` | API keys, tokens, credentials |
+| `fish/conf.d/101_secrets_exports.fish` | API keys, tokens, credentials, `CODE_*` and `NVIM_*` vars |
 | `fish/functions/gcloud_config_generate.fish` | GCP auth config |
 | `fish/*company_name*` | Employer-specific aliases |
 | `*.lock.json` (except `Brewfile.lock.json`) | Lock files |
@@ -246,8 +255,8 @@ Use `git-crypt` for sensitive files that must be committed. Atuin filters `gclou
 
 ## AI Workflow
 
-- **Primary agent**: `opencode` with project-specific agent detection from `opencode.json`
-- **Commit generation**: `commit` function — opencode + Gemini 2.5 Pro → auto-push + GitLab MR
+- **Primary agent**: `opencode` (no `opencode.json` in this repo — global config applies)
+- **Commit generation**: `commit` function — opencode + Gemini 2.5 Pro → auto-push
 - **Worktree commits**: `worktrunk` via opencode `/commit` slash command
 - **Default model**: `google-vertex/gemini-2.5-pro`
 
