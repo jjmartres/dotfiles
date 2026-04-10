@@ -34,6 +34,7 @@ LazyVim-based configuration. Each file in this directory is auto-loaded by Lazy.
 | Plugin | File | Description |
 |--------|------|-------------|
 | `folke/flash.nvim` | `motion.lua` | Jump to any visible position with 1-2 keystrokes. `s` to jump, `S` for treesitter-aware jump, `r` remote flash in operator mode. |
+| `ThePrimeagen/harpoon` | `bookmarks.lua` | Harpoon 2. Creates a tiny, active working set of files to jump between instantly. `<leader>H` adds a file, `<leader>h` shows the list, `<leader>1` through `<leader>5` jump to that slot. |
 | `stevearc/oil.nvim` | `explorer.lua` | File manager that edits the filesystem like a buffer. `-` opens parent directory, `<leader>-` opens as float. Handles renames via the snacks hook. |
 | `nvim-telescope/telescope.nvim` | `finder.lua` | Fuzzy finder with fzf-native sorting. Ignores `.git/`, `node_modules/`, `.terraform/`, and `vendor/` by default. |
 

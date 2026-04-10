@@ -111,10 +111,13 @@ All custom keymaps defined in this configuration. LazyVim default keymaps are no
 
 ---
 
-## File & Find (`<leader>f`)
+## File & Find (`<leader>f` & Harpoon)
 
 | Mode | Key | Description |
 |------|-----|-------------|
+| `n` | `<leader>H` | Add file to Harpoon list |
+| `n` | `<leader>h` | Open Harpoon list |
+| `n` | `<leader>1` to `<leader>5` | Jump to Harpoon file 1-5 |
 | `n` | `<leader>fk` | Search keymaps (Telescope) |
 | `n` | `<leader>fp` | Projects picker |
 | `n` | `-` | Open parent directory (Oil) |

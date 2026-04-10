@@ -37,6 +37,14 @@ return {
       vim.list_extend(opts.spec, {
         { "<leader>m", desc = "Zen Mode", icon = { icon = "󰚀", color = "purple" } },
 
+        { "<leader>1", desc = "Harpoon jump 1", icon = { icon = "󰛢", color = "green" } },
+        { "<leader>2", desc = "Harpoon jump 2", icon = { icon = "󰛢", color = "green" } },
+        { "<leader>3", desc = "Harpoon jump 3", icon = { icon = "󰛢", color = "green" } },
+        { "<leader>4", desc = "Harpoon jump 4", icon = { icon = "󰛢", color = "green" } },
+        { "<leader>5", desc = "Harpoon jump 5", icon = { icon = "󰛢", color = "green" } },
+        { "<leader>H", desc = "Harpoon add file", icon = { icon = "󰛢", color = "green" } },
+        { "<leader>h", desc = "Harpoon list", icon = { icon = "󰛢", color = "green" } },
+
         { "<leader>gC", desc = "Commit (Auto)", icon = { icon = "", color = "green" } },
         { "<leader>gl", group = "gitlab", icon = { icon = "", color = "orange" } },
         { "<leader>gla", group = "assignee", icon = { icon = "", color = "orange" } },
