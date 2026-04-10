@@ -21,6 +21,14 @@ All custom keymaps defined in this configuration. LazyVim default keymaps are no
 
 ---
 
+## Git — General
+
+| Mode | Key | Description |
+|------|-----|-------------|
+| `n` | `<leader>gg` | Lazygit |
+| `n` | `<leader>gb` | Git file log |
+| `n` | `<leader>gC` | Commit (runs fish `commit` function) |
+
 ## Git — Hunks (`<leader>gh`)
 
 | Mode | Key | Description |

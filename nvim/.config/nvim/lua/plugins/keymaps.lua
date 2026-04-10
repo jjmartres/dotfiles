@@ -37,6 +37,7 @@ return {
       vim.list_extend(opts.spec, {
         { "<leader>m", desc = "Zen Mode", icon = { icon = "󰚀", color = "purple" } },
 
+        { "<leader>gC", desc = "Commit (Auto)", icon = { icon = "", color = "green" } },
         { "<leader>gl", group = "gitlab", icon = { icon = "", color = "orange" } },
         { "<leader>gla", group = "assignee", icon = { icon = "", color = "orange" } },
         { "<leader>glr", group = "reviewer", icon = { icon = "", color = "orange" } },

@@ -58,6 +58,25 @@ return {
     },
   },
   {
+    "folke/snacks.nvim",
+    keys = {
+      {
+        "<leader>gC",
+        function()
+          Snacks.terminal({ "fish", "-c", "commit" }, {
+            win = {
+              style = "terminal",
+              position = "float",
+              height = 0.4,
+              width = 0.7,
+            },
+          })
+        end,
+        desc = "Commit (Auto)",
+      },
+    },
+  },
+  {
     "lewis6991/gitsigns.nvim",
     opts = function()
       Snacks.toggle({

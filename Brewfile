@@ -21,6 +21,7 @@ tap "safedep/tap"                               # Tap for safedep
 tap "steipete/tap"                              # Formulae for Homebrew
 tap "vladkens/tap"                              # Formulae for Homebrew
 tap "anomalyco/tap"                             # Formulae for Homebrew
+tap "wxtsky/tap"                                # Formulae for Homebrew
 
 ## Fonts
 cask "font-iosevka-nerd-font"
@@ -215,3 +216,4 @@ cask "musicbrainz-picard"                       # Music tagger powered by MusicB
 cask "soulseek"                                 # P2P music sharing client
 cask "steam"                                    # Steam client
 cask "vlc"                                      # Cross-platform multimedia player
+cask "codeisland"                               # Real-time AI coding agent status panel for macOS Dynamic Island (Notch)
