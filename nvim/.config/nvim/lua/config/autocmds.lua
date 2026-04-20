@@ -2,20 +2,11 @@
 -- Default autocmds that are always set: https://github.com/LazyVim/LazyVim/blob/main/lua/lazyvim/config/autocmds.lua
 -- Add any additional autocmds here
 
--- Disable spell checking in all terminal panes
-vim.api.nvim_create_autocmd("TermOpen", {
-  pattern = "*",
-  callback = function()
-    vim.opt_local.spell = false
-  end,
-  desc = "Disable spell in terminal panes",
-})
-
--- Disable spell checking in OpenCode buffers
+-- Enable spell checking only in prose files
 vim.api.nvim_create_autocmd("FileType", {
-  pattern = "opencode",
+  pattern = { "markdown", "gitcommit", "text", "txt" },
   callback = function()
-    vim.opt_local.spell = false
+    vim.opt_local.spell = true
   end,
-  desc = "Disable spell in OpenCode buffers",
+  desc = "Enable spell checking in prose files",
 })
