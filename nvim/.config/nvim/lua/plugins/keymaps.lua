@@ -24,8 +24,10 @@ return {
         ["<leader>f"] = { name = "+file/find" },
         ["<leader>g"] = { name = "+git" },
         ["<leader>gh"] = { name = "+hunks" },
+
         ["<leader>q"] = { name = "+quit/session" },
         ["<leader>s"] = { name = "+search" },
+        ["<leader>t"] = { name = "+terminal" },
         ["<leader>u"] = { name = "+ui" },
         ["<leader>w"] = { name = "+windows" },
         ["<leader>x"] = { name = "+diagnostics/quickfix" },
@@ -34,6 +36,26 @@ return {
       opts.spec = opts.spec or {}
       vim.list_extend(opts.spec, {
         { "<leader>m", desc = "Zen Mode", icon = { icon = "󰚀", color = "purple" } },
+
+        { "<leader>1", desc = "Harpoon jump 1", icon = { icon = "󰛢", color = "green" } },
+        { "<leader>2", desc = "Harpoon jump 2", icon = { icon = "󰛢", color = "green" } },
+        { "<leader>3", desc = "Harpoon jump 3", icon = { icon = "󰛢", color = "green" } },
+        { "<leader>4", desc = "Harpoon jump 4", icon = { icon = "󰛢", color = "green" } },
+        { "<leader>5", desc = "Harpoon jump 5", icon = { icon = "󰛢", color = "green" } },
+        { "<leader>H", desc = "Harpoon add file", icon = { icon = "󰛢", color = "green" } },
+        { "<leader>h", desc = "Harpoon list", icon = { icon = "󰛢", color = "green" } },
+
+        { "<leader>gC", desc = "Commit (Auto)", icon = { icon = "", color = "green" } },
+        { "<leader>gl", group = "gitlab", icon = { icon = "", color = "orange" } },
+        { "<leader>gla", group = "assignee", icon = { icon = "", color = "orange" } },
+        { "<leader>glr", group = "reviewer", icon = { icon = "", color = "orange" } },
+        { "<leader>go", group = "github", icon = { icon = "", color = "purple" } },
+
+        { "<leader>t", group = "terminal", icon = { icon = "", color = "cyan" } },
+        { "<leader>tt", desc = "Toggle Terminal", icon = { icon = "", color = "cyan" } },
+        { "<leader>tf", desc = "Float Terminal", icon = { icon = "󱂬", color = "purple" } },
+        { "<leader>th", desc = "Horizontal Terminal", icon = { icon = "󰤽", color = "blue" } },
+        { "<leader>tv", desc = "Vertical Terminal", icon = { icon = "󰤼", color = "green" } },
 
         { "<leader>z", group = "zettelkasten", icon = { icon = "󱓷", color = "azure" } },
 

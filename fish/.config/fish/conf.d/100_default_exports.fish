@@ -73,16 +73,6 @@ set -gx EDITOR /opt/homebrew/bin/nvim
 
 set -gx KUBE_CONFIG nvim
 
-set -gx OCO_AI_PROVIDER ollama
-set -gx OCO_OLLAMA_API_URL 'http://localhost:11434/api/chat'
-set -gx OCO_EMOJI true
-
-set -gx DEFAULT_GO_VERSION "1.25.3"
-
-# Set espanso path
-set -gx ESPANSO_CONFIG_DIR "$HOME/.config/espanso/"
-set -gx ESPANSO_PACKAGE_DIR "$HOME/.config/espanso/match/"
-
 set -gx ZK_NOTEBOOK_DIR "$HOME/.notes"
 
 set -gx _ZO_DATA_DIR "$HOME/.local/share/zoxide"

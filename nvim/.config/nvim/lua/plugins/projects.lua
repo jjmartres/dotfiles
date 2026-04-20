@@ -1,30 +1,58 @@
+local function projects_file()
+  return os.getenv("NVIM_PROJECTS_FILE")
+end
+
+local function load_projects()
+  local items = {}
+  local f = io.open(projects_file(), "r")
+  if not f then
+    return items
+  end
+  for line in f:lines() do
+    line = vim.trim(line)
+    if line ~= "" and not line:match("^#") then
+      local expanded = vim.fn.expand(line)
+      if vim.fn.isdirectory(expanded) == 1 then
+        local name = vim.fn.fnamemodify(expanded, ":t")
+        local parent = vim.fn.fnamemodify(expanded, ":h:t")
+        table.insert(items, {
+          text = parent .. "/" .. name,
+          file = expanded,
+        })
+      end
+    end
+  end
+  f:close()
+  return items
+end
+
 return {
   {
-    "ahmedkhalf/project.nvim",
+    "folke/snacks.nvim",
     opts = {
-      manual_mode = false,
-      patterns = {
-        ".git",
-        "Makefile",
-        "package.json",
-        "Componentfile",
-        ".terraform-version",
-        "skaffold.yaml",
-        "Chart.yaml",
-        "values.yaml",
-        "README.md",
-        "CHANGELOG.md",
-      },
+      picker = { enabled = true },
     },
-    event = "VeryLazy",
-    config = function(_, opts)
-      require("project_nvim").setup(opts)
-      LazyVim.on_load("telescope.nvim", function()
-        require("telescope").load_extension("projects")
-      end)
-    end,
     keys = {
-      { "<leader>fp", "<Cmd>Telescope projects<CR>", desc = "Projects" },
+      {
+        "<leader>fp",
+        function()
+          Snacks.picker({
+            title = "Projects",
+            items = load_projects(),
+            format = function(item)
+              return { { item.text, "SnacksPickerFile" } }
+            end,
+            confirm = function(picker, item)
+              picker:close()
+              if item then
+                vim.fn.chdir(item.file)
+                Snacks.picker.files({ cwd = item.file })
+              end
+            end,
+          })
+        end,
+        desc = "Projects",
+      },
     },
   },
 }

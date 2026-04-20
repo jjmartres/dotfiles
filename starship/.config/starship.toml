@@ -1,21 +1,25 @@
 # Get editor completions based on the config schema
 "$schema" = 'https://starship.rs/config-schema.json'
 
-# Format prompt
-format = "$directory       $golang$nodejs$python$lua$git_branch$git_status$fill$cmd_duration$gcloud$kubernetes$terraform$time$character"
+# Format prompt: Left side | Right side (via $fill)
+format = """
+$directory $golang$nodejs$python$lua$git_branch$git_status$fill$cmd_duration$gcloud$kubernetes$terraform$time
+$character"""
+
+# Dynamic palette based on OS Dark/Light mode (exported by Fish as $DEFAULT_THEME)
 palette = "catppuccin-macchiato"
 
 # Modules
 [directory]
 style = "fg:text bg:background"
-format = '[$path]($style)'
+format = '[$path]($style) '
 truncation_length = 1
 truncation_symbol = "~/../"
 
 [character]
-success_symbol = '[❯](bold green) '
-error_symbol = '[❯](bold red) '
-format = "\n$symbol"
+success_symbol = '[❯](bold green)'
+error_symbol = '[❯](bold red)'
+format = "$symbol "
 
 [fill]
 symbol = " "
@@ -23,11 +27,21 @@ style = "fg:surface0"
 
 [git_branch]
 style = "fg:peach bg:background"
-format = '[$symbol$branch(:$remote_branch)]($style)'
+format = '[$symbol$branch(:$remote_branch)]($style) '
 
 [git_status]
 style = "fg:red bg:background"
-format = '[$all_status$ahead_behind]($style)'
+format = '([\[$all_status$ahead_behind\]]($style) )'
+conflicted = "​= "
+ahead = "⇡${count} "
+behind = "⇣${count} "
+diverged = "⇕⇡${ahead_count}⇣${behind_count} "
+untracked = "​?${count} "
+stashed = "​$ "
+modified = "​!${count} "
+staged = "​+${count} "
+renamed = "​»${count} "
+deleted = "​✘${count} "
 
 [golang]
 style = "fg:teal bg:background"
@@ -55,7 +69,6 @@ detect_files = [
   "setup.py",
   "tox.ini",
 ]
-detect_folders = []
 
 [lua]
 style = "fg:teal bg:background"
@@ -85,7 +98,7 @@ format = "[󱁢 $workspace]($style) [-](fg:surface0) "
 
 [time]
 style = "fg:green bg:background"
-format = "[\ue383 $time]($style) "
+format = "[\ue383 $time]($style)"
 time_format = "%H:%M:%S"
 disabled = false
 
@@ -105,7 +118,7 @@ text = "#cad3f5"
 yellow = "#eed49f"
 
 [palettes.catppuccin-latte]
-background-color = "transparent"
+background = "transparent"
 blue = "#1e66f5"
 green = "#40a02b"
 maroon = "#e64553"

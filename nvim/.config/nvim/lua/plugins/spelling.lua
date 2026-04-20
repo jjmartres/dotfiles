@@ -2,7 +2,16 @@ return {
   {
     "mason-org/mason.nvim",
     opts = function(_, opts)
-      vim.list_extend(opts.ensure_installed, { "typos-lsp", "harper-ls" })
+      vim.list_extend(opts.ensure_installed, {
+        "typos-lsp",
+        "harper-ls",
+        "gofumpt",
+        "prettier",
+        "shfmt",
+        "stylua",
+        "taplo",
+        "yamlfmt",
+      })
     end,
   },
   {

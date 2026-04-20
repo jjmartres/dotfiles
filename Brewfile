@@ -1,25 +1,27 @@
 ## Configure where our applications go
 cask_args appdir: "/Applications"
 
-## Tap homebrew
+## Taps
+tap "AlexsJones/llmfit"                         # Formulae for Homebrew
 tap "aquasecurity/trivy"                        # Tap for the Trivy security scanner
+tap "arimxyer/tap"                              # Formulae for Homebrew
 tap "buo/cask-upgrade"                          # Tap for the cask-upgrade tool
 tap "doganarif/tap"                             # Formulae for Homebrew
 tap "fairwindsops/tap"                          # Formulae for Homebrew
 tap "FelixKratz/formulae"                       # Formulae for Homebrew
+tap "gromgit/brewtils"                          # Formulae for Homebrew
 tap "hashicorp/tap"                             # Tap for Hashicorp tools
+tap "jundot/omlx", "https://github.com/jundot/omlx"       # Tap for omlx
 tap "koekeishiya/formulae"                      # Formulae for Homebrew
 tap "lusingander/tap"                           # Formulae for Homebrew
+tap "macos-fuse-t/homebrew-cask"                # Formulae for Homebrew
 tap "robusta-dev/homebrew-krr"                  # Formulae for Homebrew
 tap "rvarunrathod/tap"                          # Formulae for Homebrew
 tap "safedep/tap"                               # Tap for safedep
-tap "vladkens/tap"                              # Formulae for Homebrew
-tap "rvarunrathod/tap"                          # Formulae for Homebrew
 tap "steipete/tap"                              # Formulae for Homebrew
-tap "macos-fuse-t/homebrew-cask"                # Formulae for Homebrew
-tap "AlexsJones/llmfit"                         # Formulae for Homebrew
-tap "arimxyer/tap"                              # Formulae for Homebrew
-tap "gromgit/brewtils"                          # Formulae for Homebrew
+tap "vladkens/tap"                              # Formulae for Homebrew
+tap "anomalyco/tap"                             # Formulae for Homebrew
+tap "wxtsky/tap"                                # Formulae for Homebrew
 
 ## Fonts
 cask "font-iosevka-nerd-font"
@@ -31,21 +33,20 @@ cask "sf-symbols" if OS.mac?
 ## Shell Utilities
 brew "aria2"                                    # A modern, lightweight, and efficient download utility
 brew "ast-grep"                                 # Structural search and replace for code
+brew "atuin"                                    # Sync, search and backup shell history with Atuin
 brew "bat"                                      # Cat clone with syntax highlighting and Git integration
 brew "binutils"                                 # Collection of binary tools
 brew "btop"                                     # A monitor of resources
 brew "coreutils"                                # Basic command-line utilities (ls, cp, etc.)
 brew "curl"                                     # Tool to transfer data from/to a server
-brew "httpie"                                   # HTTPie is a command line HTTP client
 brew "dnstracer"                                # Traces DNS query paths
 brew "eza"                                      # ls replacement easy to use and simple to install
 brew "fastfetch"                                # Fast system information script
-brew "fd"                                       # Simple, fast and user-friendly alternative to 'find'
+brew "fd"                                       # Simple, fast and user-friendly alternative to find
 brew "findutils"                                # Utilities for finding files
 brew "fish"                                     # Fish shell (alternative to zsh)
 brew "fisher"                                   # Plugin manager for fish
 brew "fzf"                                      # Fuzzy finder for the command line
-brew "television"                               # A fast, portable and hackable fuzzy finder for the terminal.
 brew "gawk"                                     # GNU version of the awk text processing tool
 brew "gmp"                                      # GNU Multiple Precision Arithmetic Library
 brew "gnu-getopt"                               # GNU version of getopt for command-line options
@@ -55,6 +56,8 @@ brew "gnu-tar"                                  # GNU version of the tar archivi
 brew "gnutls"                                   # GNU Transport Layer Security library
 brew "go-task"                                  # Task runner / simpler Make alternative written in Go
 brew "grep"                                     # Command-line utility for searching plain-text data sets
+brew "httpie"                                   # Command line HTTP client
+brew "macmon"                                   # Monitor CPU, memory, network, disk, and process activity on your Mac
 brew "moreutils"                                # Additional Unix utilities
 brew "nmap"                                     # Network exploration tool and security scanner
 brew "nushell"                                  # Modern shell for the GitHub era
@@ -65,28 +68,29 @@ brew "rename"                                   # Utility for batch renaming fil
 brew "ripgrep"                                  # Line-oriented search tool that recursively searches directories
 brew "rlwrap"                                   # Adds readline input editing to other utilities
 brew "rsync"                                    # Utility for synchronizing files and directories
-brew "shfmt"                                    # Shell formatters with support for bash and zsh
+brew "shfmt"                                    # Shell formatter with support for bash and zsh
 brew "socat"                                    # Multipurpose relay tool
 brew "sqlite3"                                  # Command-line interface for SQLite databases
 brew "ssh-copy-id"                              # Copies your public key to a remote host for passwordless login
 brew "sslscan"                                  # Tests SSL/TLS services to find supported cipher suites
 brew "starship"                                 # Cross-shell prompt for any shell
 brew "stow"                                     # Manages symbolic links for package installation
-brew "superfile"                                # Perfect Terminal-based file manager
+brew "superfile"                                # Terminal-based file manager
+brew "television"                               # A fast, portable and hackable fuzzy finder for the terminal
 brew "tree"                                     # Displays directory contents in a tree-like format
 brew "uni2ascii"                                # Converts Unicode strings to ASCII equivalents
-brew "vivid"                                    # vivid is a generator for the LS_COLORS environment variable that controls the colorized output of ls / eza
+brew "vivid"                                    # Generator for the LS_COLORS environment variable
 brew "watch"                                    # Executes a program periodically, showing output in full screen
 brew "wget"                                     # Tool to download files from the web
 brew "z"                                        # Jump to frequently used directories
-brew "zellij"                                   # A terminal session mananger
+brew "zellij"                                   # Terminal session manager
+brew "zk"                                       # Zettelkasten CLI
 brew "zlib"                                     # Compression library
 brew "zoxide"                                   # Smarter cd command, learns your habits
-brew "zk"                                       # Zettelkasten CLI
 
-## Improve OSx UI experience
-#brew "borders" if OS.mac?                      # lightweight tool designed to add colored borders to user windows
-brew "mole"                                     # Deep clean and optimize your Mac.
+## Improve macOS UI Experience
+#brew "borders" if OS.mac?                      # Lightweight tool to add colored borders to user windows
+brew "mole"                                     # Deep clean and optimize your Mac
 #brew "skhd" if OS.mac?                         # Simple hotkey daemon for macOS
 #brew "yabai" if OS.mac?                        # Yet Another Bouncer for macOS
 
@@ -99,21 +103,22 @@ brew "git-lfs"                                  # Git extension for versioning l
 brew "glab"                                     # GitLab CLI
 brew "lazygit"                                  # Simple terminal UI for git commands
 brew "mercurial"                                # Distributed revision control system
-brew "serie"                                    # A rich git commit graph in your terminal, like magic
+brew "serie"                                    # A rich git commit graph in your terminal
 
 ## Development Tools
 brew "asdf"                                     # Extendable version manager with support for Ruby, Node.js, Elixir, Erlang & more
+brew "atac"                                     # A terminal client for the API
 brew "cmake"                                    # Cross-platform build system generator
+brew "csvkit"                                   # A suite of command-line tools for converting to and working with CSV
 brew "gcc"                                      # GNU Compiler Collection
 brew "glow"                                     # Render markdown on the terminal
-brew "golangci-lint"                            # Fast linters Runner for Go
+brew "golangci-lint"                            # Fast linters runner for Go
+brew "harper"                                   # Free grammar checker that respects your privacy
 brew "jq"                                       # Lightweight and flexible command-line JSON processor
-brew "csvkit"                                   # A suite of command-line tools for converting to and working with CSV
 brew "libpq"                                    # PostgreSQL C client library
 brew "lua"                                      # Powerful, lightweight programming language
 brew "lua-language-server"                      # Language Server Protocol implementation for Lua
 brew "luajit", args: ["HEAD"]                   # High-performance Lua JIT compiler (HEAD version)
-brew "macmon"                                   # Monitor CPU, memory, network, disk, and process activity on your Mac
 brew "markdown-toc"                             # Generate table of contents for Markdown files
 brew "mysql-client"                             # MySQL command-line client
 brew "neovim"                                   # Hyperextensible Vim-based text editor
@@ -122,49 +127,47 @@ brew "poetry"                                   # Python dependency management a
 brew "prettier"                                 # Opinionated code formatter
 brew "prettierd"                                # Opinionated code formatter (daemon)
 brew "pydantic"                                 # Data validation and settings management using Python type hints
+brew "python@3.11"                              # Required dependency for omlx
 brew "rust"                                     # Systems programming language
 brew "tree-sitter-cli"                          # CLI tool for managing Tree-sitter parsers
-brew "uv"                                       # Universal package manager for cli tools
+brew "uv"                                       # Fast Python package and project manager
+brew "worktrunk"                                # CLI for git worktree management, designed for running AI agents in parallel
 brew "yq"                                       # Portable command-line YAML processor
-brew "harper"                                    # The Free Grammar Checker That Respects Your Privacy
-brew "worktrunk"                                # Worktrunk is a CLI for git worktree management, designed for running AI agents in parallel.
 
 ## For Reachy Mini
 brew "gobject-introspection"                    # GObject introspection tools
-brew "pkg-config"                               # Package management tool for libraries
 brew "gstreamer"                                # GStreamer Multimedia Framework
+brew "huggingface-cli"                          # CLI for Hugging Face models
 brew "libnice-gstreamer"                        # ICE library for GStreamer
-brew "huggingface-cli"                          # CLI for huggingface models
+brew "pkg-config"                               # Package management tool for libraries
 
 ## DevOps Tools
 brew "ansible"                                  # Automation engine
-brew "atac"                                     # A terminal client for the API
-brew "atuin"                                    # Sync, search and backup shell history with Atuin
 brew "checkov"                                  # Static analysis tool for infrastructure-as-code
-brew "dive"                                     # Tool for exploring each layer in a docker image
+brew "dive"                                     # Tool for exploring each layer in a Docker image
 brew "hadolint"                                 # Dockerfile linter
 brew "hashicorp/tap/packer"                     # Tool for building machine images
 brew "helm"                                     # The Kubernetes Package Manager
 brew "helmfile"                                 # Declaratively manage Helm charts
 brew "infracost"                                # Cloud cost estimation for Terraform
 brew "istioctl"                                 # CLI tool for Istio service mesh
-brew "jira-cli"                                 # A Textual User Interface for interacting with Atlassian Jira from your shell
-brew "jiratui"                                  # A Textual User Interface for interacting with Atlassian Jira from your shell
-brew "jsonnet"                                  # Configuration language for Google Cloud Platform
+brew "jira-cli"                                 # Feature-rich interactive Jira command line client
+brew "jsonnet"                                  # Configuration language for app and tool developers
 brew "jsonnet-bundler"                          # Package manager for Jsonnet
-brew "k9s"                                      # Kubernetes CLI To Manage Your Clusters In Style!
-brew "k9sight"                                  # A fast, keyboard-driven TUI for debugging Kubernetes workloads
+brew "k9s"                                      # Kubernetes CLI to manage your clusters in style
+brew "k9sight"                                  # Fast, keyboard-driven TUI for debugging Kubernetes workloads
 brew "kubebuilder"                              # CLI tool for building Kubernetes APIs
 brew "kubecolor"                                # Add colors to kubectl output
 brew "kubectx"                                  # Tool to switch between Kubernetes contexts
+brew "kubectl"                                  # Kubernetes CLI tool
 brew "kustomize"                                # Kubernetes native configuration management
 brew "mongodb-atlas"                            # MongoDB Atlas CLI
 brew "polaris"                                  # Validation of Kubernetes YAML
 brew "pre-commit"                               # Framework for managing and maintaining multi-language pre-commit hooks
 brew "redis"                                    # In-memory data structure store, often used for caching/brokerage
-brew "robusta-dev/homebrew-krr/krr"             # Kubernetes Resource Reporter
+brew "robusta-dev/homebrew-krr/krr"             # Kubernetes Resource Recommender
 brew "sipcalc"                                  # Simple IP calculator
-brew "skaffold"                                 # Easy and Repeatable Kubernetes Development
+brew "skaffold"                                 # Easy and repeatable Kubernetes development
 brew "terraform-docs"                           # Generate documentation from Terraform modules
 brew "terraform-ls"                             # Language Server Protocol for Terraform
 brew "terraformer"                              # Generate tf/json and hcl from existing infrastructure
@@ -173,6 +176,9 @@ brew "terrascan"                                # Static code analyzer for Infra
 brew "tfenv"                                    # Terraform version manager
 brew "tflint"                                   # Terraform linter
 brew "tfsec"                                    # Security scanner for Terraform code
+brew "colima"                                   # Container runtimes with minimal setup
+brew "docker"                                   # Docker command-line client
+brew "docker-compose"                           # Define and run multi-container applications
 
 ## Graphics
 brew "asciinema"                                # Record and share terminal sessions
@@ -189,37 +195,25 @@ brew "aquasecurity/trivy/trivy"                 # Simple and comprehensive vulne
 brew "safedep/tap/vet"                          # Safely manage your dependencies
 
 ## AI
-brew "ollama"                                   # Run large language models locally
-brew "opencode"                                 # The AI coding agent built for the terminal
-brew "llmfit"                                   # LLM Fit is a tool that allows you to find which model runs on your hardware
-brew "models"                                   # A terminal dashboard for comparing AI model providers
-brew "gromgit/brewtils/taproom"                 # Taproom is a tool for discovering and installing Homebrew formulae
+brew "llmfit"                                   # Find which LLM models run on your hardware
+brew "anomalyco/tap/opencode"                   # AI coding agent built for the terminal
+brew "pi-coding-agent"                          # Pi coding agent
+brew "omlx"                                     # Run AI models locally and privately using MLX
 
-
-## Fun
-brew "c2048"                                    # Terminal version of the 2048 game
-brew "fortune"                                  # Print a random, hopefully interesting, adage
-
-## Cask Applications (General)
-cask "bruno"                                    # Fully-offline API-client today
-cask "cyberduck"                                # FTP, SFTP, WebDAV, Amazon S3, OpenStack Swift, Backblaze B2, Microsoft Azure & OneDrive, Google Drive
+## Cask Applications
+cask "cyberduck"                                # FTP, SFTP, WebDAV, S3, Azure, Google Drive and more
 cask "dbeaver-community"                        # Database management tool
-cask "devpod"                                   # DevPod is a tool used to create reproducible developer environments.
 cask "discord"                                  # Chat with your friends
+cask "gcloud-cli"                               # Command-line tool for Google Cloud Platform
 cask "ghostty"                                  # Modern and customizable terminal emulator
 cask "gitkraken"                                # Cross-platform Git GUI client
-cask "gitkraken-cli"                            # Cross-platform Git Cli
-cask "gcloud-cli"                               # Command-line tool for Google Cloud Platform
+cask "gitkraken-cli"                            # Cross-platform Git CLI
 cask "hiddenbar"                                # Utility to hide menu bar icons
 cask "maccy"                                    # Clipboard manager
-cask "opencode-desktop"                         # The AI coding agent built for the terminal
-cask "soulseek"                                 # P2P music streamer
+cask "macos-fuse-t/homebrew-cask/fuse-t"        # FUSE for macOS in userspace
+cask "macos-fuse-t/homebrew-cask/fuse-t-sshfs"  # SSHFS via Fuse-T
+cask "musicbrainz-picard"                       # Music tagger powered by MusicBrainz
+cask "soulseek"                                 # P2P music sharing client
 cask "steam"                                    # Steam client
 cask "vlc"                                      # Cross-platform multimedia player
-cask "zed"                                      # Zed is a minimal code editor crafted for speed and collaboration with humans and AI.
-cask "hifidelity"                               # HiFiDeity is a free, open-source audio player for Windows, macOS, and Linux.
-cask "macos-fuse-t/homebrew-cask/fuse-t"        # Fuse-T is a cross-platform file system in userspace
-cask "macos-fuse-t/homebrew-cask/fuse-t-sshfs"  # Fuse-T is a cross-platform file system in userspace
-cask "lm-studio"                                # Run AI models, locally and privately.
-cask "transmission"                             # A fast, easy, and free BitTorrent client
-cask "musicbrainz-picard"                       # MusicBrain is a free, open-source, cross-platform application for analyzing and comparing your music collections.
+cask "codeisland"                               # Real-time AI coding agent status panel for macOS Dynamic Island (Notch)

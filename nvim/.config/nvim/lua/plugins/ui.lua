@@ -56,15 +56,10 @@ return {
             { icon = " ", key = "q", desc = "Quit", action = ":qa" },
           },
           header = [[
-                                                      
-               ████ ██████           █████      ██
-              ███████████             █████ 
-              █████████ ███████████████████ ███   ███████████
-             █████████  ███    █████████████ █████ ██████████████
-            █████████ ██████████ █████████ █████ █████ ████ █████
-          ███████████ ███    ███ █████████ █████ █████ ████ █████
-         ██████  █████████████████████ ████ █████ █████ ████ ██████
-      ]],
+          --
+          They're are many IDE, but this one is mine.
+          --
+          ]],
         },
         sections = {
           { section = "header" },
@@ -90,12 +85,6 @@ return {
                   -- fish fonction
                   cmd = "handle_git_remote",
                   height = 3,
-                },
-                {
-                  icon = "󰆘",
-                  title = "Fortune cookie",
-                  cmd = "fortune -e",
-                  height = 2,
                 },
               }
               return vim.tbl_map(function(cmd)
@@ -165,7 +154,7 @@ return {
           { section = "startup" },
         },
       },
-      lazzygit = { enabled = true },
+      lazygit = { enabled = true },
       terminal = { enabled = true },
       zen = {
         enabled = true,
@@ -183,12 +172,18 @@ return {
     },
     keys = {
       {
-        "<leader>z",
+        "<leader>gg",
         function()
-          Snacks.zen()
+          Snacks.lazygit()
         end,
-        desc = "Toggle Zen Mode",
-        mode = "n",
+        desc = "Lazygit",
+      },
+      {
+        "<leader>gb",
+        function()
+          Snacks.lazygit.log_file()
+        end,
+        desc = "Git File Log",
       },
       {
         "<c-/>",

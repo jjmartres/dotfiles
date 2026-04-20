@@ -208,6 +208,15 @@ keybinds {
         // CUSTOM KEYBINDINGS - Ctrl+Alt
         // ============================================================
 
+        // Tab picker
+        bind "Ctrl Alt t" {
+            Run "fish" "-c" "tab" {
+                floating true
+                close_on_exit true
+                name " tabs"
+            }
+        }
+
         // Session Management
         bind "Ctrl Alt d" { Detach; }                    // Detach from session
         bind "Ctrl Alt q" { Quit; }                      // Quit/Close session
@@ -230,6 +239,7 @@ keybinds {
         // Tab Navigation
         bind "Ctrl Alt ]" { GoToPreviousTab; }           // Previous tab
         bind "Ctrl Alt [" { GoToNextTab; }               // Next tab
+
     }
     shared_except "normal" "locked" {
         bind "Enter" "Esc" { SwitchToMode "Normal"; }

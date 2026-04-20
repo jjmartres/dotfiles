@@ -39,6 +39,7 @@ fzf --fish | source
 
 # Initialize starship
 starship init fish | source
+enable_transience
 starship config palette $DEFAULT_THEME
 
 set -gx LS_COLORS (vivid generate $DEFAULT_THEME)

@@ -1,0 +1,275 @@
+# Agent Context — dotfiles
+
+## Identity
+
+Personal dotfiles repository managed with **GNU Stow**.
+
+---
+
+## Repository Structure
+
+Every top-level directory is a **Stow package**. Its internal layout mirrors `$HOME`, so `stow */` symlinks each package into `$HOME`.
+
+```
+dotfiles/
+├── bootstrap.sh              # Entry point: dispatches by OS, then stow */
+├── bootstrap.d/darwin/       # macOS bootstrap scripts (numbered, run in order)
+├── bootstrap.d/linux/        # Linux bootstrap scripts
+├── Brewfile                  # Declarative package manifest — source of truth
+├── .stowrc                   # target=$HOME; ignore patterns
+├── .pre-commit-config.yaml   # YAML lint, EOF, trailing-whitespace checks
+├── fish/                     # Primary shell (functions/, conf.d/, completions/)
+├── nvim/                     # Neovim — LazyVim-based
+├── zellij/                   # Terminal multiplexer + layouts
+├── git/                      # Global gitconfig + template
+├── starship/                 # Cross-shell prompt
+├── atuin/                    # Shell history sync
+├── television/               # Fuzzy finder — custom cable channels
+├── worktrunk/                # Git worktree manager
+└── …                         # One directory per tool
+```
+
+---
+
+## Bootstrap & Deploy Commands
+
+```fish
+# Full bootstrap (macOS)
+sh ./bootstrap.sh
+
+# Deploy all symlinks (after editing configs)
+stow --dir=(pwd) --target=$HOME */
+
+# Restow a single package after changes
+stow -R fish
+stow -R nvim
+
+# Simulate before deploying (dry-run)
+stow --simulate --dir=(pwd) --target=$HOME */
+```
+
+### Brewfile Management
+
+```fish
+brew bundle --file ~/dotfiles/Brewfile         # install / reconcile
+brew install <pkg> && brew bundle dump --force  # add + record
+brew bundle cleanup --file ~/dotfiles/Brewfile  # audit
+```
+
+---
+
+## Lint / Validation
+
+No automated tests. Validation is pre-commit hooks + manual stow simulation.
+
+```fish
+pre-commit run --all-files   # run all hooks on every file
+```
+
+Hooks (run on `pre-commit` and `pre-push` stages):
+- `check-yaml` — validates all YAML files
+- `end-of-file-fixer` — every file must end with a newline
+- `trailing-whitespace` — strips trailing whitespace
+
+### Fish Syntax Check (single file)
+
+```fish
+fish -n fish/.config/fish/functions/my_fn.fish
+```
+
+### Full System Update
+
+```fish
+update   # nvim plugins → Mason → CLT → asdf → brew bundle → brew upgrade → cleanup
+```
+
+---
+
+## Shell Environment
+
+- **Shell**: Fish (`/opt/homebrew/bin/fish`)
+- **Always use Fish syntax** — no bashisms
+- **Forbidden**: `export`, `source`, `$()` subshells (use `(cmd)`), `[[`, `&&`/`||` (use `; and`/`; or`)
+- **Prompt**: Starship — theme driven by `$DEFAULT_THEME`
+- **Terminal**: Ghostty (primary); Zellij still configured but not the default session runner
+- **Version manager**: asdf (`~/.asdf/shims`)
+
+### Theme System
+
+`$DEFAULT_THEME` is auto-detected at shell init via macOS dark/light mode:
+- Dark → `catppuccin-macchiato` · Light → `catppuccin-latte`
+
+Never hardcode a theme name. All tools use Catppuccin; always reference `$DEFAULT_THEME`.
+
+---
+
+## Code Style Guidelines
+
+### Fish — Functions
+
+- **One function per file**, filename = function name: `functions/my_fn.fish`
+- First line: `function name --description "..."`
+- `set -l` for locals; `set -gx` for exported globals
+- **Critical scoping rule**: `set -l` inside an `if`/`else` branch is local to that branch only.
+  Declare the variable before the conditional, then reassign without `-l` inside branches:
+  ```fish
+  set -l layout default          # declare outside
+  if test -f "$dir/$name.kdl"
+      set layout $name           # reassign, no -l
+  end
+  ```
+- Use `set_color` for terminal output — never raw ANSI codes
+- Argument validation: `test (count $argv) -eq N`
+- Multi-branch argument parsing: `switch`/`case`, not nested `if`
+- Flag parsing pattern: loop `$argv`, match flags with `switch`, collect positionals separately
+- Exit codes: `return 0` success, `return 1` error
+- Long logic belongs in `functions/` — never inline in `conf.d/`
+
+### Fish — fzf Integration
+
+Critical patterns when calling fzf from Fish:
+
+- **Always use `fzf < file`**, never `cat file | fzf`. Piping closes stdin so fzf cannot open `/dev/tty` for its UI — the list appears empty.
+- **Tab delimiter**: Fish does not expand `\t` in strings. Use `set -l tab (printf '\t')` and pass as `--delimiter $tab` (two separate arguments — `--delimiter=$tab` embeds the tab into the flag string and breaks field splitting).
+- **`--nth` and `--with-nth` must not be used together** for the same field scope. `--with-nth` transforms the line before `--nth` splits it — if `--with-nth=2` renders a single-field string, `--nth=2` finds no tab and matches nothing.
+- **Multi-column picker pattern** (scope match to name, display name+remote, output path):
+  ```fish
+  # Cache format: name\tremote\tpath
+  printf '%-40s\t(%s)\t%s\n' "$parent/$bname" $remote $p
+  # fzf invocation:
+  set -l tab (printf '\t')
+  fzf --delimiter $tab --nth=1 --with-nth=1,2 < $cache_file | cut -f3
+  ```
+
+### Fish — conf.d/ Load Order
+
+| Prefix | Purpose |
+|--------|---------|
+| `000_` | Initialization (Homebrew path, theme detection) |
+| `100_` | Environment variable exports |
+| `200_` | Aliases and abbreviations |
+| `600_` | Work-specific (gitignored) |
+
+- Use `abbr` for git shortcuts (expand inline) — not `alias`
+- Use `alias` only for non-git shell shortcuts
+
+### Fish — Completions
+
+Completion files live in `fish/.config/fish/completions/<command>.fish`. Conventions:
+- Always start with `complete -c <cmd> -f` to disable default file completion
+- Use helper functions prefixed `__<cmd>_` for dynamic candidate lists
+- Condition flags with `-n` guards using `contains -- <flag> (commandline -opc)`
+- Re-enable directory completion for path arguments with `complete -c <cmd> -F -n "..."`
+- Suppress conflicting flags from each other with mutual `-n` guards
+
+### Zellij — Layouts (KDL)
+
+- Layouts live in `zellij/.config/zellij/layouts/<name>.kdl`
+- `default.kdl` is the fallback when no session-specific layout exists
+- Session creation: try `<session>.kdl`, fall back to `default.kdl`; declare layout variable before the `if`, reassign inside (scoping rule above)
+- Tab name icons: use Nerd Font glyphs (`󱃾`, ``, `󰆦`, `` etc.)
+- Suspended tabs: use `start_suspended=true` for heavy processes (k9s, nibbler)
+- Plain terminal tab: `tab name="  terminal" { pane }`
+
+### Neovim Plugins
+
+- Plugin files live in `nvim/.config/nvim/lua/plugins/`
+- **Name files by usage, not by plugin name**: `git.lua`, `completion.lua`, `formatting.lua`, not `gitsigns.lua`, `blink.lua`, `conform.lua`
+- Each file returns a Lazy.nvim spec table; multiple specs in one file are merged by plugin name
+- See `nvim/.config/nvim/lua/plugins/README.md` for the full plugin inventory
+
+### Brewfile
+
+- Groups separated by `## Category` comments
+- Format: `brew "name"  # Description` (align comments at column 42)
+- Taps before formulae; fonts before shell utilities
+- Platform conditionals: `if OS.mac?` inline, not separate blocks
+
+### YAML / Configuration
+
+- 2-space indentation; no YAML anchors unless necessary
+- All YAML must pass `check-yaml`
+
+### Terraform
+
+- `for_each` over `count` always
+- Explicit `depends_on` when ordering matters
+- `lifecycle { prevent_destroy = true }` on stateful resources (CloudSQL, GCS, KMS)
+
+### Python
+
+- Type hints on all functions and class attributes
+- `uv` for dependency management (`uv add`, `uv sync`) — never `pip install`
+- Dataclasses over plain dicts; `pydantic` for external data validation
+
+### Git Commits
+
+Conventional commits with emoji (enforced by the `commit` function):
+
+| Emoji | Type | Use for |
+|-------|------|---------|
+| ✨ | `feat:` | new feature |
+| 🐛 | `fix:` | bug fix |
+| ♻️ | `refactor:` | restructure without behaviour change |
+| 🚀 | `ci:` | CI/CD changes |
+| 📝 | `docs:` | documentation |
+| 🔧 | `chore:` | maintenance |
+| 🔒 | `security:` | security fix |
+| ⬆️ | `deps:` | dependency update |
+
+Default branch: `develop`. Push with `--force-with-lease`, never `--force`.
+
+---
+
+## Environment Variables
+
+### `code` function — set in `conf.d/101_secrets_exports.fish`
+
+| Variable | Purpose | Default |
+|----------|---------|---------|
+| `CODE_CACHE_DIR` | Cache directory for repo list | `~/.fish_code_function_cache` |
+| `CODE_DEFAULT_SESSION` | Cache filename stem (e.g. `fintecture`) | _(empty → falls back to `repositories`)_ |
+| `CODE_DEFAULT_PATH` | Root path to search for git repos | _(empty)_ |
+| `NVIM_PROJECTS_FILE` | Neovim project list — set to `$CODE_CACHE_DIR/$CODE_DEFAULT_SESSION.nvim` | _(empty)_ |
+
+**Cache file flow**: `code --refresh` writes two files:
+- `$CODE_CACHE_DIR/$CODE_DEFAULT_SESSION` — tab-delimited (`name\tremote\tpath`), read by fzf
+- `$CODE_CACHE_DIR/$CODE_DEFAULT_SESSION.nvim` — one absolute path per line, read by Neovim via `NVIM_PROJECTS_FILE`
+
+---
+
+## Secrets & Sensitive Files
+
+Never commit — gitignored by pattern:
+
+| File / Pattern | Contents |
+|----------------|----------|
+| `fish/conf.d/101_secrets_exports.fish` | API keys, tokens, credentials, `CODE_*` and `NVIM_*` vars |
+| `fish/functions/gcloud_config_generate.fish` | GCP auth config |
+| `fish/*company_name*` | Employer-specific aliases |
+| `*.lock.json` (except `Brewfile.lock.json`) | Lock files |
+
+Use `git-crypt` for sensitive files that must be committed. Atuin filters `gcloud secrets`, `gcloud kms`, `gcloud auth`, and `gcloud compute ssh` from history.
+
+---
+
+## AI Workflow
+
+- **Primary agent**: `opencode` (no `opencode.json` in this repo — global config applies)
+- **Commit generation**: `commit` function — opencode + Gemini 2.5 Pro → auto-push
+- **Worktree commits**: `worktrunk` via opencode `/commit` slash command
+- **Default model**: `google-vertex/gemini-2.5-pro`
+
+### Memory Bank
+
+At session start for substantial tasks, check for `.opencode/memory-bank/` in the project root. If present, read all files before proceeding (`projectbrief.md`, `activeContext.md`, `systemPatterns.md`, `techContext.md`, `progress.md`).
+
+---
+
+## Response Style
+
+- Be concise — no preamble or filler
+- Show **complete** file content when editing configs — never truncate with `# ... rest unchanged`
+- Fish syntax in all terminal examples
+- Maintain Brewfile comment alignment and category grouping when editing
+- After changes to a stow package, note the required restow: `stow -R <package>`
