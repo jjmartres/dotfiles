@@ -179,6 +179,7 @@ brew "tfsec"                                    # Security scanner for Terraform
 brew "colima"                                   # Container runtimes with minimal setup
 brew "docker"                                   # Docker command-line client
 brew "docker-compose"                           # Define and run multi-container applications
+brew "docker-buildx"                            # Docker CLI plugin for building and pushing container images
 
 ## Graphics
 brew "asciinema"                                # Record and share terminal sessions

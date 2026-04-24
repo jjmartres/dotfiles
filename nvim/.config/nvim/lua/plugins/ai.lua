@@ -1,5 +1,19 @@
 return {
   {
+    "carderne/pi-nvim",
+    config = function()
+      require("pi-nvim").setup()
+
+      vim.keymap.set({ "n", "v" }, "<leader>p", ":Pi<CR>", { desc = "Send to pi" })
+      vim.keymap.set("n", "<leader>pp", ":PiSend<CR>", { desc = "Send prompt" })
+      vim.keymap.set("n", "<leader>pf", ":PiSendFile<CR>", { desc = "Send file" })
+      vim.keymap.set("v", "<leader>ps", ":PiSendSelection<CR>", { desc = "Send selection" })
+      vim.keymap.set("n", "<leader>pb", ":PiSendBuffer<CR>", { desc = "Send buffer" })
+      vim.keymap.set("n", "<leader>pi", ":PiPing<CR>", { desc = "Ping pi" })
+      vim.keymap.set("n", "<leader>pS", ":PiSessions<CR>", { desc = "Switch session" })
+    end,
+  },
+  {
     "nickjvandyke/opencode.nvim",
     version = "*", -- Latest stable release
     dependencies = {

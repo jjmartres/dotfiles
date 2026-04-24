@@ -117,6 +117,7 @@ LazyVim-based configuration. Each file in this directory is auto-loaded by Lazy.
 | Plugin | File | Description |
 |--------|------|-------------|
 | `nickjvandyke/opencode.nvim` | `ai.lua` | OpenCode AI agent inside Neovim. `<C-a>` sends selection to it, `<C-x>` opens action picker, `<C-.>` toggles the panel. `go`/`goo` operator motions to add ranges to the session. |
+| `carderne/pi-nvim` | `ai.lua` | Bridge between pi coding agent and Neovim. Connects via unix socket to a running pi session. `<leader>p` opens the send dialog, `<leader>pp` prompt, `<leader>pf` file, `<leader>ps` selection, `<leader>pb` buffer, `<leader>pi` ping, `<leader>pS` switch session. |
 
 ---
 
