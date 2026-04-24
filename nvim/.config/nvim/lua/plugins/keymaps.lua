@@ -31,6 +31,7 @@ return {
         ["<leader>u"] = { name = "+ui" },
         ["<leader>w"] = { name = "+windows" },
         ["<leader>x"] = { name = "+diagnostics/quickfix" },
+        ["<leader>p"] = { name = "+pi" },
       }
 
       opts.spec = opts.spec or {}
