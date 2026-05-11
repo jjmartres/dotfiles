@@ -22,6 +22,7 @@ tap "steipete/tap"                              # Formulae for Homebrew
 tap "vladkens/tap"                              # Formulae for Homebrew
 tap "anomalyco/tap"                             # Formulae for Homebrew
 tap "wxtsky/tap"                                # Formulae for Homebrew
+tap "kosmorro/tap"                              # Formulae for Homebrew
 
 ## Fonts
 cask "font-iosevka-nerd-font"
@@ -201,6 +202,9 @@ brew "anomalyco/tap/opencode"                   # AI coding agent built for the 
 brew "pi-coding-agent"                          # Pi coding agent
 brew "omlx"                                     # Run AI models locally and privately using MLX
 
+## Astronomy
+brew "kosmorro"                                 # A program to calculate your ephemerides
+
 ## Cask Applications
 cask "cyberduck"                                # FTP, SFTP, WebDAV, S3, Azure, Google Drive and more
 cask "dbeaver-community"                        # Database management tool
@@ -211,8 +215,6 @@ cask "gitkraken"                                # Cross-platform Git GUI client
 cask "gitkraken-cli"                            # Cross-platform Git CLI
 cask "hiddenbar"                                # Utility to hide menu bar icons
 cask "maccy"                                    # Clipboard manager
-cask "macos-fuse-t/homebrew-cask/fuse-t"        # FUSE for macOS in userspace
-cask "macos-fuse-t/homebrew-cask/fuse-t-sshfs"  # SSHFS via Fuse-T
 cask "musicbrainz-picard"                       # Music tagger powered by MusicBrainz
 cask "soulseek"                                 # P2P music sharing client
 cask "steam"                                    # Steam client
