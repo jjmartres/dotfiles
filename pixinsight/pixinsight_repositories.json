@@ -1,0 +1,277 @@
+{
+  "metadata": {
+    "title": "PixInsight Plugin & Script Repository Directory",
+    "description": "Curated list of third-party PixInsight plugin and script repositories, ordered as they appear in the Manage Update Repositories panel.",
+    "generated": "2026-05-13",
+    "total_entries": 19
+  },
+  "repositories": [
+    {
+      "id": "starxterminator",
+      "name": "StarXTerminator",
+      "type": "plugin",
+      "author": "Russell Croman (RC Astro)",
+      "license": "commercial",
+      "repository_url": "https://www.rc-astro.com/StarXTerminator/PixInsight",
+      "website": "https://www.rc-astro.com/software/sxt/",
+      "pixinsight_category": "Process > Object Recognition / Mask Generation",
+      "description": "AI-powered star removal and separation plugin. Separates stars from nebulosity, producing both a starless image and a stars-only image for independent processing and later recombination. Correctly handles PixInsight masks to protect designated areas from star removal. Also available for Photoshop and Affinity Photo. Requires AVX-capable CPU; GPU acceleration supported.",
+      "tags": ["star-removal", "star-separation", "ai", "mask", "paid"]
+    },
+    {
+      "id": "noisexterminator",
+      "name": "NoiseXTerminator",
+      "type": "plugin",
+      "author": "Russell Croman (RC Astro)",
+      "license": "commercial",
+      "repository_url": "https://www.rc-astro.com/NoiseXTerminator/PixInsight",
+      "website": "https://www.rc-astro.com/software/nxt/",
+      "pixinsight_category": "Process > Noise Reduction",
+      "description": "AI-powered noise reduction plugin. Features separate control over intensity vs. color noise and high-frequency vs. low-frequency noise components. The AI3 architecture preserves faint details while suppressing large-scale noise simultaneously. Supports iterative application. Works on both linear and non-linear data. Also available for Photoshop and Affinity Photo. Requires AVX-capable CPU.",
+      "tags": ["noise-reduction", "ai", "linear", "non-linear", "paid"]
+    },
+    {
+      "id": "blurxterminator",
+      "name": "BlurXTerminator",
+      "type": "plugin",
+      "author": "Russell Croman (RC Astro)",
+      "license": "commercial",
+      "repository_url": "https://www.rc-astro.com/BlurXTerminator/PixInsight",
+      "website": "https://www.rc-astro.com/software/bxt/",
+      "pixinsight_category": "Process > Deconvolution",
+      "description": "AI-powered deconvolution plugin for astronomical images. Automatically determines the PSF from stars in the image with no manual extraction step. Handles spatially varying aberrations (coma, chromatic aberration, field curvature, guiding errors) across the field of view. Applies different sharpening amounts to stellar vs. non-stellar features to avoid ringing. PixInsight-only (requires linear data). Requires AVX-capable CPU; GPU acceleration via CoreML (Mac) or CUDA/OpenCL (Windows/Linux).",
+      "tags": [
+        "deconvolution",
+        "sharpening",
+        "ai",
+        "aberration-correction",
+        "paid"
+      ]
+    },
+    {
+      "id": "pixinsight-toolbox",
+      "name": "PixInsight Toolbox",
+      "type": "script-collection",
+      "author": "iDeviceApps",
+      "license": "free",
+      "repository_url": "https://www.ideviceapps.de/PixInsight/Utilities/",
+      "website": "https://www.ideviceapps.de/pixinsight-toolbox.html",
+      "pixinsight_category": "Various",
+      "description": "A collection of utility scripts and tools for PixInsight, including helpers for creating OSC (One-Shot Color) palettes and various workflow automation tasks. All tools install under the PixInsight Toolbox category after adding the repository and checking for updates.",
+      "tags": ["utilities", "osc", "palette", "free"]
+    },
+    {
+      "id": "imageblend",
+      "name": "ImageBlend",
+      "type": "script",
+      "author": "Mike Cranfield & Adam Block (Cosmic Photons)",
+      "license": "free",
+      "repository_url": "https://www.cosmicphotons.com/pi-scripts/imageblend/",
+      "website": "https://cosmicphotons.com/scripts/",
+      "pixinsight_category": "Script > Utilities",
+      "description": "Blends two images together using a wide range of blending methods. A key feature is the ability to apply an independent stretch to each component image before blending, allowing fine control over relative pixel intensities. The blend layer can additionally be filtered (blur, high-pass) and its opacity adjusted for refined compositing results.",
+      "tags": ["blending", "compositing", "stretch", "free"]
+    },
+    {
+      "id": "colormask",
+      "name": "ColorMask",
+      "type": "script",
+      "author": "Rick Stevenson (distributed via Cosmic Photons)",
+      "license": "free",
+      "repository_url": "https://www.cosmicphotons.com/pi-scripts/colormask/",
+      "website": "https://cosmicphotons.com/scripts/",
+      "pixinsight_category": "Script",
+      "description": "The original ColorMask script by Rick Stevenson, part of the standard PixInsight distribution, made available here via a signed repository for convenient installation and updates. Generates masks targeting specific hue ranges in an image for selective color processing.",
+      "tags": ["color-mask", "selective-processing", "free"]
+    },
+    {
+      "id": "solartoolbox",
+      "name": "SolarToolbox",
+      "type": "process-module",
+      "author": "Mike Cranfield & Bill Blanshan (Cosmic Photons)",
+      "license": "free",
+      "repository_url": "https://www.cosmicphotons.com/pi-modules/solartoolbox/",
+      "website": "https://cosmicphotons.com/scripts/",
+      "pixinsight_category": "Process > Solar",
+      "description": "Process module for solar image processing with real-time PixInsight preview support. Provides colorization of monochrome solar data, contrast and sharpness enhancement, and a proprietary stretch designed to reveal faint or hidden prominences while keeping the solar disk properly exposed. Developed in collaboration with Bill Blanshan; tutorial video available on his YouTube channel.",
+      "tags": ["solar", "colorization", "real-time-preview", "free"]
+    },
+    {
+      "id": "starreduction",
+      "name": "StarReduction",
+      "type": "script",
+      "author": "Mike Cranfield & Bill Blanshan (Cosmic Photons)",
+      "license": "free",
+      "repository_url": "https://www.cosmicphotons.com/pi-scripts/starreduction/",
+      "website": "https://cosmicphotons.com/scripts/",
+      "pixinsight_category": "Script > Utilities",
+      "description": "Reduces the apparent size of stars in astrophotography images using multiple configurable reduction approaches. Features a live preview window. Integrates with the ScreenStars workflow: reduced stars can be saved for later recombination with a starless image using the reverse-stretch method.",
+      "tags": ["star-reduction", "star-size", "preview", "free"]
+    },
+    {
+      "id": "screenstars",
+      "name": "ScreenStars",
+      "type": "script",
+      "author": "Mike Cranfield & Bill Blanshan (Cosmic Photons)",
+      "license": "free",
+      "repository_url": "https://www.cosmicphotons.com/pi-scripts/screenstars/",
+      "website": "https://cosmicphotons.com/scripts/",
+      "pixinsight_category": "Script > Utilities",
+      "description": "Star removal and replacement via the screen/unscreen blending method. Includes a reverse-stretch option that converts non-linear images to a pseudo-linear state before star operations, significantly improving star color retention — especially useful when recombining narrowband starless images with RGB stars. Features a live preview window.",
+      "tags": [
+        "star-removal",
+        "star-replacement",
+        "screening",
+        "reverse-stretch",
+        "free"
+      ]
+    },
+    {
+      "id": "drawannotation",
+      "name": "DrawAnnotation",
+      "type": "script",
+      "author": "Mike Cranfield (Cosmic Photons)",
+      "license": "free",
+      "repository_url": "https://www.cosmicphotons.com/pi-scripts/drawannotation/",
+      "website": "https://cosmicphotons.com/scripts/",
+      "pixinsight_category": "Script > Render",
+      "description": "Annotates astrophotography images directly within PixInsight by drawing arrows and adding text labels. Useful for highlighting features of interest such as supernovae, asteroids, or image artifacts. Arrows and text are placed interactively with mouse clicks; includes a live preview.",
+      "tags": ["annotation", "arrow", "text", "render", "free"]
+    },
+    {
+      "id": "bfke",
+      "name": "BatchFITSKeywordEdit (BFKE)",
+      "type": "script",
+      "author": "Mike Cranfield (Cosmic Photons)",
+      "license": "free",
+      "repository_url": "https://www.cosmicphotons.com/pi-scripts/bfke/",
+      "website": "https://cosmicphotons.com/scripts/",
+      "pixinsight_category": "Script > Batch Processing",
+      "description": "Batch-edits FITS header keywords across multiple files — add, modify, or delete keywords in one operation. Processed files are saved to a specified output folder. Ideal for correcting or enriching metadata across large sets of calibration or light frames. Tutorial video by Adam Block available.",
+      "tags": ["FITS", "keywords", "batch", "metadata", "free"]
+    },
+    {
+      "id": "ghs",
+      "name": "Generalised Hyperbolic Stretch (GHS)",
+      "type": "process-module",
+      "author": "Dave Payne & Mike Cranfield",
+      "license": "free",
+      "repository_url": "https://www.ghsastro.co.uk/updates/",
+      "website": "https://www.ghsastro.co.uk/",
+      "pixinsight_category": "Process > IntensityTransformations",
+      "description": "Implements the Generalised Hyperbolic Stretch equations as a compiled PixInsight process module. Five-parameter control over the intensity transformation supports initial linear-to-nonlinear stretching, contrast enhancement, dynamic range adjustment, and per-channel balancing. Includes real-time preview and histogram display. Proposed by Dave Payne in 2021, released as a script in December 2021, then as a compiled process module in November 2022. Tutorial videos and full documentation at ghsastro.co.uk.",
+      "tags": ["stretch", "histogram", "hyperbolic", "non-linear", "free"]
+    },
+    {
+      "id": "closeview",
+      "name": "CloseView",
+      "type": "script",
+      "author": "Mike Cranfield (Cosmic Photons)",
+      "license": "free",
+      "repository_url": "https://www.cosmicphotons.com/pi-scripts/closeview/",
+      "website": "https://cosmicphotons.com/scripts/",
+      "pixinsight_category": "Script > Utilities",
+      "description": "Utility script designed for use inside PixInsight Process Containers. Closes intermediate or temporary views generated during a container sequence, keeping the workspace tidy once the automated process completes. Particularly useful in complex workflows that produce multiple intermediate images.",
+      "tags": [
+        "utilities",
+        "process-container",
+        "workspace",
+        "automation",
+        "free"
+      ]
+    },
+    {
+      "id": "copyastrometricsolution",
+      "name": "CopyAstrometricSolution",
+      "type": "script",
+      "author": "Mike Cranfield (Cosmic Photons)",
+      "license": "free",
+      "repository_url": "https://www.cosmicphotons.com/pi-scripts/copyastrometricsolution/",
+      "website": "https://cosmicphotons.com/scripts/",
+      "pixinsight_category": "Script > Utilities",
+      "description": "Copies the astrometric solution (plate-solve data) from a source view to the currently active view. Can be combined with an Image Container to bulk-copy an astrometric solution to a large group of images in a single automated operation.",
+      "tags": ["astrometry", "plate-solve", "batch", "utilities", "free"]
+    },
+    {
+      "id": "nsg-pmm",
+      "name": "NormalizeScaleGradient (NSG) & PhotometricMosaic (PMM)",
+      "type": "script-collection",
+      "author": "John Murrell (AstroProcessing)",
+      "license": "free",
+      "repository_url": "https://pixinsight.astroprocessing.com/",
+      "website": "https://astroprocessing.com/",
+      "pixinsight_category": "Script",
+      "description": "Repository providing two major scripts. NormalizeScaleGradient (NSG) normalizes scale and gradient across multiple sub-frames prior to integration, correcting for varying sky backgrounds and light pollution gradients between sessions. PhotometricMosaic (PMM) assembles multi-panel mosaics photometrically, handling overlap regions and blending seams for seamless large-field composites.",
+      "tags": [
+        "normalization",
+        "mosaic",
+        "gradient",
+        "photometric",
+        "integration",
+        "free"
+      ]
+    },
+    {
+      "id": "setiastro",
+      "name": "SetiAstro Script Suite",
+      "type": "script-collection",
+      "author": "Frank (SetiAstro)",
+      "license": "free",
+      "repository_url": "https://raw.githubusercontent.com/setiastro/pixinsight-updates/main/",
+      "website": "https://www.setiastro.com/pjsr-scripts",
+      "pixinsight_category": "Script > SetiAstro",
+      "description": "Comprehensive suite of free PixInsight scripts. Key tools include: Star Stretch (linear stars-only image to non-linear with color boost and green cast removal), NB-to-RGB Star Combination (combines Ha/OIII/SII star-only frames into realistic RGB stars), BlemishBlaster (content-aware healing to remove artifacts, satellite trails and lens flares — algorithm-based, no AI), Halo-B-Gon (star halo reduction), What's In My Image (SIMBAD cross-reference via astrometric solution), AstroMark (watermark/signature adder), AstroDepth (depth enhancement), and more. All scripts appear under Script > SetiAstro after installation. Requires PixInsight build 1605 or higher.",
+      "tags": [
+        "star-stretch",
+        "blemish-removal",
+        "narrowband",
+        "healing",
+        "utilities",
+        "free"
+      ]
+    },
+    {
+      "id": "dbxtract",
+      "name": "DBXtract (Dual Band eXtract)",
+      "type": "script",
+      "author": "Raúl Hussein (Astrocitas)",
+      "license": "free",
+      "repository_url": "https://dbxtract.astrocitas.com/",
+      "website": "https://dbxtract.astrocitas.com/",
+      "pixinsight_category": "Script",
+      "description": "Extracts narrowband signal (SII, Hα, Hβ, OIII) from OSC camera data captured through dual-band filters (e.g. Optolong L-Ultimate, Askar ColorMagic). Uses the quantum efficiency (QE) curves of common Sony IMX sensors to mathematically separate each emission band's contribution from the RGB channels. Produces individual monochrome channel outputs ready for SHO or other palette combinations. Supports multiple IMX sensors (571, 533, 094, 455, 662, 462, 294, and more). Note: a trailing slash is required in the repository URL when adding it in PixInsight.",
+      "tags": [
+        "narrowband",
+        "dual-band",
+        "OSC",
+        "signal-extraction",
+        "SHO",
+        "free"
+      ]
+    },
+    {
+      "id": "nbcolourmapper",
+      "name": "NarrowbandColourMapper",
+      "type": "script",
+      "author": "Mike Cranfield (Cosmic Photons)",
+      "license": "free",
+      "repository_url": "https://www.cosmicphotons.com/pi-scripts/nbcolourmapper/",
+      "website": "https://cosmicphotons.com/scripts/",
+      "pixinsight_category": "Script > Utilities",
+      "description": "Converts grayscale narrowband data into a full-color image via a flexible, visually interactive interface. Allows custom color assignments to multiple narrowband channels (Ha, OIII, SII, and others) with dynamic per-layer intensity adjustment for balanced output. Ideal for exploring and creating custom narrowband palettes beyond the standard SHO/HOO mappings.",
+      "tags": ["narrowband", "color-mapping", "SHO", "HOO", "palette", "free"]
+    },
+    {
+      "id": "narrowbandnormalization",
+      "name": "NarrowbandNormalization",
+      "type": "process-module",
+      "author": "Mike Cranfield & Bill Blanshan (Cosmic Photons)",
+      "license": "free",
+      "repository_url": "https://www.cosmicphotons.com/pi-modules/narrowbandnormalization/",
+      "website": "https://cosmicphotons.com/scripts/",
+      "pixinsight_category": "Process > ColorCalibration > NarrowbandNormalization",
+      "description": "Balances the intensities of individual color channels in narrowband RGB images. Takes a preferably starless RGB image with narrowband channels mapped to a color palette and normalizes their relative contributions for a perceptually balanced result. Comes with built-in documentation; detailed tutorial video by Bill Blanshan available on YouTube.",
+      "tags": ["narrowband", "normalization", "channel-balance", "free"]
+    }
+  ]
+}
