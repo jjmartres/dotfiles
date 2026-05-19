@@ -18,7 +18,6 @@ tap "macos-fuse-t/homebrew-cask"                # Formulae for Homebrew
 tap "robusta-dev/homebrew-krr"                  # Formulae for Homebrew
 tap "rvarunrathod/tap"                          # Formulae for Homebrew
 tap "safedep/tap"                               # Tap for safedep
-tap "steipete/tap"                              # Formulae for Homebrew
 tap "vladkens/tap"                              # Formulae for Homebrew
 tap "anomalyco/tap"                             # Formulae for Homebrew
 tap "wxtsky/tap"                                # Formulae for Homebrew
@@ -175,7 +174,6 @@ brew "terraformer"                              # Generate tf/json and hcl from 
 brew "terrahelp"                                # Collection of helpful Terraform utilities
 brew "terrascan"                                # Static code analyzer for Infrastructure as Code
 brew "tfenv"                                    # Terraform version manager
-brew "tflint"                                   # Terraform linter
 brew "tfsec"                                    # Security scanner for Terraform code
 brew "colima"                                   # Container runtimes with minimal setup
 brew "docker"                                   # Docker command-line client
@@ -220,3 +218,4 @@ cask "soulseek"                                 # P2P music sharing client
 cask "steam"                                    # Steam client
 cask "vlc"                                      # Cross-platform multimedia player
 cask "codeisland"                               # Real-time AI coding agent status panel for macOS Dynamic Island (Notch)
+cask "terraform-linters/tap/tflint"             # Terraform linter
