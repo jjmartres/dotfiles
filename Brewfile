@@ -172,7 +172,6 @@ brew "terraform-docs"                           # Generate documentation from Te
 brew "terraform-ls"                             # Language Server Protocol for Terraform
 brew "terraformer"                              # Generate tf/json and hcl from existing infrastructure
 brew "terrahelp"                                # Collection of helpful Terraform utilities
-brew "terrascan"                                # Static code analyzer for Infrastructure as Code
 brew "tfenv"                                    # Terraform version manager
 brew "tfsec"                                    # Security scanner for Terraform code
 brew "colima"                                   # Container runtimes with minimal setup
@@ -199,6 +198,7 @@ brew "llmfit"                                   # Find which LLM models run on y
 brew "anomalyco/tap/opencode"                   # AI coding agent built for the terminal
 brew "pi-coding-agent"                          # Pi coding agent
 brew "omlx"                                     # Run AI models locally and privately using MLX
+brew "rtk"                                      # CLI proxy that reduces LLM token consumption by 60-90% on common dev commands
 
 ## Astronomy
 brew "kosmorro"                                 # A program to calculate your ephemerides
