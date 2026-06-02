@@ -4,22 +4,17 @@ cask_args appdir: "/Applications"
 ## Taps
 tap "AlexsJones/llmfit"                         # Formulae for Homebrew
 tap "aquasecurity/trivy"                        # Tap for the Trivy security scanner
-tap "arimxyer/tap"                              # Formulae for Homebrew
 tap "buo/cask-upgrade"                          # Tap for the cask-upgrade tool
 tap "doganarif/tap"                             # Formulae for Homebrew
 tap "fairwindsops/tap"                          # Formulae for Homebrew
-tap "FelixKratz/formulae"                       # Formulae for Homebrew
-tap "gromgit/brewtils"                          # Formulae for Homebrew
 tap "hashicorp/tap"                             # Tap for Hashicorp tools
 tap "jundot/omlx", "https://github.com/jundot/omlx"       # Tap for omlx
-tap "koekeishiya/formulae"                      # Formulae for Homebrew
 tap "lusingander/tap"                           # Formulae for Homebrew
-tap "macos-fuse-t/homebrew-cask"                # Formulae for Homebrew
 tap "robusta-dev/homebrew-krr"                  # Formulae for Homebrew
-tap "rvarunrathod/tap"                          # Formulae for Homebrew
 tap "safedep/tap"                               # Tap for safedep
 tap "vladkens/tap"                              # Formulae for Homebrew
 tap "anomalyco/tap"                             # Formulae for Homebrew
+tap "terraform-linters/tap"                     # Tap for TFLint
 tap "wxtsky/tap"                                # Formulae for Homebrew
 tap "kosmorro/tap"                              # Formulae for Homebrew
 
@@ -89,10 +84,7 @@ brew "zlib"                                     # Compression library
 brew "zoxide"                                   # Smarter cd command, learns your habits
 
 ## Improve macOS UI Experience
-#brew "borders" if OS.mac?                      # Lightweight tool to add colored borders to user windows
 brew "mole"                                     # Deep clean and optimize your Mac
-#brew "skhd" if OS.mac?                         # Simple hotkey daemon for macOS
-#brew "yabai" if OS.mac?                        # Yet Another Bouncer for macOS
 
 ## Versioning (Git)
 brew "diff-so-fancy"                            # Compare anything with git
@@ -176,6 +168,7 @@ brew "tfenv"                                    # Terraform version manager
 brew "tfsec"                                    # Security scanner for Terraform code
 brew "colima"                                   # Container runtimes with minimal setup
 brew "docker"                                   # Docker command-line client
+brew "docker-completion"                        # Bash completion for Docker
 brew "docker-compose"                           # Define and run multi-container applications
 brew "docker-buildx"                            # Docker CLI plugin for building and pushing container images
 
