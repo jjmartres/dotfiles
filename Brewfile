@@ -181,6 +181,7 @@ brew "gifsicle"                                 # Tool for creating, manipulatin
 brew "graphviz"                                 # Open-source graph visualization software
 brew "imagemagick"                              # Software suite to create, edit, compose, or convert bitmap images
 brew "marp-cli"                                 # Markdown presentation ecosystem
+brew "sdl2"                                     # Simple DirectMedia Layer
 
 ## Security
 brew "aquasecurity/trivy/trivy"                 # Simple and comprehensive vulnerability scanner
