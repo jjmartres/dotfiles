@@ -120,6 +120,7 @@ brew "prettier"                                 # Opinionated code formatter
 brew "prettierd"                                # Opinionated code formatter (daemon)
 brew "pydantic"                                 # Data validation and settings management using Python type hints
 brew "python@3.11"                              # Required dependency for omlx
+brew "python@3.13"                              # Required dependency for gcloud-cli
 brew "rust"                                     # Systems programming language
 brew "tree-sitter-cli"                          # CLI tool for managing Tree-sitter parsers
 brew "uv"                                       # Fast Python package and project manager
@@ -162,13 +163,12 @@ brew "sipcalc"                                  # Simple IP calculator
 brew "skaffold"                                 # Easy and repeatable Kubernetes development
 brew "terraform-docs"                           # Generate documentation from Terraform modules
 brew "terraform-ls"                             # Language Server Protocol for Terraform
-brew "terraformer"                              # Generate tf/json and hcl from existing infrastructure
 brew "terrahelp"                                # Collection of helpful Terraform utilities
 brew "tfenv"                                    # Terraform version manager
 brew "tfsec"                                    # Security scanner for Terraform code
 brew "colima"                                   # Container runtimes with minimal setup
 brew "docker"                                   # Docker command-line client
-brew "docker-completion"                        # Bash completion for Docker
+# docker-completion removed — deprecated upstream; completions now bundled with docker formula
 brew "docker-compose"                           # Define and run multi-container applications
 brew "docker-buildx"                            # Docker CLI plugin for building and pushing container images
 

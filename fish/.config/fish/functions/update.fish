@@ -9,7 +9,7 @@ function update --description "Update Neovim plugins, Homebrew packages, and sys
     set -l normal (set_color normal)
 
     # Check if 'os' argument is passed
-    if test "$argv[1]" = os
+    if test (count $argv) -gt 0; and test "$argv[1]" = "os"
         echo $blue"═══════════════════════════════════════"$normal
         echo $blue"  Installing OS Updates and Restarting"$normal
         echo $blue"═══════════════════════════════════════"$normal
@@ -34,7 +34,7 @@ function update --description "Update Neovim plugins, Homebrew packages, and sys
     end
 
     echo $yellow"➤ Updating Mason packages..."$normal
-    if nvim --headless "+Mason" +qa
+    if nvim --headless +"Lazy load mason.nvim" +"MasonUpdate" +qa
         echo $green"✓ Mason packages updated"$normal
     else
         echo $red"✗ Mason update failed"$normal
@@ -68,23 +68,24 @@ function update --description "Update Neovim plugins, Homebrew packages, and sys
     or echo $red"✗ Spec-kit update failed"$normal
     echo
 
+    # Set Homebrew to not require tap trust to prevent bundle/cleanup failures
+    set -x HOMEBREW_NO_REQUIRE_TAP_TRUST 1
+
     # Update Homebrew
     echo $yellow"➤ Updating Homebrew packages..."$normal
-
-    # Run brew bundle if Brewfile exists
-    if test -f "$dotfiles_path/Brewfile"
-        pushd "$dotfiles_path"
-        and brew bundle
-        or begin
-            echo $red"✗ Brew bundle failed"$normal
-        end
-    else
-        echo $yellow"⚠ Brewfile not found at $dotfiles_path"$normal
-    end
 
     brew update
     and echo $green"✓ Brew updated"$normal
     or echo $red"✗ Brew update failed"$normal
+
+    # Run brew bundle if Brewfile exists
+    if test -f "$dotfiles_path/Brewfile"
+        brew bundle --file="$dotfiles_path/Brewfile"
+        and echo $green"✓ Brew bundle completed"$normal
+        or echo $red"✗ Brew bundle failed"$normal
+    else
+        echo $yellow"⚠ Brewfile not found at $dotfiles_path"$normal
+    end
 
     brew upgrade
     and echo $green"✓ Packages upgraded"$normal
@@ -100,13 +101,27 @@ function update --description "Update Neovim plugins, Homebrew packages, and sys
     end
 
     brew cleanup --prune=all
-    brew bundle cleanup --force
-    and echo $green"✓ Cleanup completed"$normal
-    or echo $red"✗ Cleanup failed"$normal
+    set -l cleanup_status $status
+
+    if test -f "$dotfiles_path/Brewfile"
+        brew bundle cleanup --file="$dotfiles_path/Brewfile" --force
+        if test $status -ne 0
+            set cleanup_status 1
+        end
+    end
+
+    if test $cleanup_status -eq 0
+        echo $green"✓ Cleanup completed"$normal
+    else
+        echo $red"✗ Cleanup failed"$normal
+    end
 
     brew doctor
-    and echo $green"✓ Brew update complete!"$normal
-    or echo $red"✗ Brew update failed"$normal
+    if test $status -eq 0
+        echo $green"✓ Brew doctor complete!"$normal
+    else
+        echo $yellow"⚠ Brew doctor found warnings"$normal
+    end
 
     echo
     echo $blue"═══════════════════════════════════════"$normal
