@@ -70,6 +70,11 @@ function update --description "Update Neovim plugins, Homebrew packages, and sys
 
     # Set Homebrew to not require tap trust to prevent bundle/cleanup failures
     set -x HOMEBREW_NO_REQUIRE_TAP_TRUST 1
+    # Disable interactive prompts during Homebrew operations
+    set -x HOMEBREW_NO_ASK 1
+
+    # Disable gcloud CLI prompts during updates
+    set -x CLOUDSDK_CORE_DISABLE_PROMPTS 1
 
     # Update Homebrew
     echo $yellow"➤ Updating Homebrew packages..."$normal
