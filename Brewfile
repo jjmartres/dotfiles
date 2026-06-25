@@ -71,7 +71,6 @@ brew "sslscan"                                  # Tests SSL/TLS services to find
 brew "starship"                                 # Cross-shell prompt for any shell
 brew "stow"                                     # Manages symbolic links for package installation
 brew "superfile"                                # Terminal-based file manager
-brew "television"                               # A fast, portable and hackable fuzzy finder for the terminal
 brew "tree"                                     # Displays directory contents in a tree-like format
 brew "uni2ascii"                                # Converts Unicode strings to ASCII equivalents
 brew "vivid"                                    # Generator for the LS_COLORS environment variable
