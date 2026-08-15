@@ -17,6 +17,7 @@ tap "anomalyco/tap"                             # Formulae for Homebrew
 tap "terraform-linters/tap"                     # Tap for TFLint
 tap "wxtsky/tap"                                # Formulae for Homebrew
 tap "kosmorro/tap"                              # Formulae for Homebrew
+tap "ARahim3/mlx-dspark", "https://github.com/ARahim3/mlx-dspark"       # Tap for MLX DSpark
 
 ## Fonts
 cask "font-iosevka-nerd-font"
@@ -184,7 +185,6 @@ brew "sdl2"                                     # Simple DirectMedia Layer
 
 ## Security
 brew "aquasecurity/trivy/trivy"                 # Simple and comprehensive vulnerability scanner
-brew "safedep/tap/vet"                          # Safely manage your dependencies
 
 ## AI
 brew "llmfit"                                   # Find which LLM models run on your hardware
@@ -212,3 +212,5 @@ cask "steam"                                    # Steam client
 cask "vlc"                                      # Cross-platform multimedia player
 cask "codeisland"                               # Real-time AI coding agent status panel for macOS Dynamic Island (Notch)
 cask "terraform-linters/tap/tflint"             # Terraform linter
+cask "mlx-dspark"                               # MLX Spark
+cask "safedep/tap/vet"                          # Safely manage your dependencies
