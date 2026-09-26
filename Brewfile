@@ -2,22 +2,23 @@
 cask_args appdir: "/Applications"
 
 ## Taps
-tap "AlexsJones/llmfit"                         # Formulae for Homebrew
-tap "aquasecurity/trivy"                        # Tap for the Trivy security scanner
-tap "buo/cask-upgrade"                          # Tap for the cask-upgrade tool
-tap "doganarif/tap"                             # Formulae for Homebrew
-tap "fairwindsops/tap"                          # Formulae for Homebrew
-tap "hashicorp/tap"                             # Tap for Hashicorp tools
-tap "jundot/omlx", "https://github.com/jundot/omlx"       # Tap for omlx
-tap "lusingander/tap"                           # Formulae for Homebrew
-tap "robusta-dev/homebrew-krr"                  # Formulae for Homebrew
-tap "safedep/tap"                               # Tap for safedep
-tap "vladkens/tap"                              # Formulae for Homebrew
-tap "anomalyco/tap"                             # Formulae for Homebrew
-tap "terraform-linters/tap"                     # Tap for TFLint
-tap "wxtsky/tap"                                # Formulae for Homebrew
-tap "kosmorro/tap"                              # Formulae for Homebrew
-tap "ARahim3/mlx-dspark", "https://github.com/ARahim3/mlx-dspark"       # Tap for MLX DSpark
+tap "AlexsJones/llmfit"                                                           # Formulae for Homebrew
+tap "aquasecurity/trivy"                                                          # Tap for the Trivy security scanner
+tap "buo/cask-upgrade"                                                            # Tap for the cask-upgrade tool
+tap "doganarif/tap"                                                               # Formulae for Homebrew
+tap "fairwindsops/tap"                                                            # Formulae for Homebrew
+tap "hashicorp/tap"                                                               # Tap for Hashicorp tools
+tap "jundot/omlx", "https://github.com/jundot/omlx"                               # Tap for omlx
+tap "lusingander/tap"                                                             # Formulae for Homebrew
+tap "robusta-dev/homebrew-krr"                                                    # Formulae for Homebrew
+tap "safedep/tap"                                                                 # Tap for safedep
+tap "vladkens/tap"                                                                # Formulae for Homebrew
+tap "anomalyco/tap"                                                               # Formulae for Homebrew
+tap "terraform-linters/tap"                                                       # Tap for TFLint
+tap "wxtsky/tap"                                                                  # Formulae for Homebrew
+tap "kosmorro/tap"                                                                # Formulae for Homebrew (Kosmorro)
+tap "ARahim3/mlx-dspark", "https://github.com/ARahim3/mlx-dspark"                 # Tap for MLX DSpark
+tap "funstuie-bit/jukeboxcli", "https://github.com/funstuie-bit/JukeboxCli.git"   # Tap for Jukebox CLI
 
 ## Fonts
 cask "font-iosevka-nerd-font"
@@ -182,13 +183,15 @@ brew "graphviz"                                 # Open-source graph visualizatio
 brew "imagemagick"                              # Software suite to create, edit, compose, or convert bitmap images
 brew "marp-cli"                                 # Markdown presentation ecosystem
 brew "sdl2"                                     # Simple DirectMedia Layer
+brew "funstuie-bit/jukeboxcli/jukeboxcli"       # Jukebox CLI
 
 ## Security
 brew "aquasecurity/trivy/trivy"                 # Simple and comprehensive vulnerability scanner
 
 ## AI
 brew "llmfit"                                   # Find which LLM models run on your hardware
-brew "anomalyco/tap/opencode"                   # AI coding agent built for the terminal
+#brew "anomalyco/tap/opencode"                   # AI coding agent built for the terminal -- v1
+brew "anomalyco/tap/opencode-v2"                # AI coding agent built for the terminal -- v2
 brew "pi-coding-agent"                          # Pi coding agent
 brew "omlx"                                     # Run AI models locally and privately using MLX
 brew "rtk"                                      # CLI proxy that reduces LLM token consumption by 60-90% on common dev commands
@@ -199,7 +202,6 @@ brew "kosmorro"                                 # A program to calculate your ep
 ## Cask Applications
 cask "cyberduck"                                # FTP, SFTP, WebDAV, S3, Azure, Google Drive and more
 cask "dbeaver-community"                        # Database management tool
-cask "discord"                                  # Chat with your friends
 cask "gcloud-cli"                               # Command-line tool for Google Cloud Platform
 cask "ghostty"                                  # Modern and customizable terminal emulator
 cask "gitkraken"                                # Cross-platform Git GUI client
@@ -207,10 +209,9 @@ cask "gitkraken-cli"                            # Cross-platform Git CLI
 cask "hiddenbar"                                # Utility to hide menu bar icons
 cask "maccy"                                    # Clipboard manager
 cask "musicbrainz-picard"                       # Music tagger powered by MusicBrainz
-cask "soulseek"                                 # P2P music sharing client
-cask "steam"                                    # Steam client
-cask "vlc"                                      # Cross-platform multimedia player
-cask "codeisland"                               # Real-time AI coding agent status panel for macOS Dynamic Island (Notch)
+#cask "soulseek"                                 # P2P music sharing client
+#cask "steam"                                    # Steam client
+#cask "codeisland"                               # Real-time AI coding agent status panel for macOS Dynamic Island (Notch)
 cask "terraform-linters/tap/tflint"             # Terraform linter
 cask "mlx-dspark"                               # MLX Spark
 cask "safedep/tap/vet"                          # Safely manage your dependencies
