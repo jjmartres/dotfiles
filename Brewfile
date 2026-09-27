@@ -2,23 +2,22 @@
 cask_args appdir: "/Applications"
 
 ## Taps
-tap "AlexsJones/llmfit"                                                           # Formulae for Homebrew
-tap "aquasecurity/trivy"                                                          # Tap for the Trivy security scanner
-tap "buo/cask-upgrade"                                                            # Tap for the cask-upgrade tool
-tap "doganarif/tap"                                                               # Formulae for Homebrew
-tap "fairwindsops/tap"                                                            # Formulae for Homebrew
-tap "hashicorp/tap"                                                               # Tap for Hashicorp tools
-tap "jundot/omlx", "https://github.com/jundot/omlx"                               # Tap for omlx
-tap "lusingander/tap"                                                             # Formulae for Homebrew
-tap "robusta-dev/homebrew-krr"                                                    # Formulae for Homebrew
-tap "safedep/tap"                                                                 # Tap for safedep
-tap "vladkens/tap"                                                                # Formulae for Homebrew
-tap "anomalyco/tap"                                                               # Formulae for Homebrew
-tap "terraform-linters/tap"                                                       # Tap for TFLint
-tap "wxtsky/tap"                                                                  # Formulae for Homebrew
-tap "kosmorro/tap"                                                                # Formulae for Homebrew (Kosmorro)
-tap "ARahim3/mlx-dspark", "https://github.com/ARahim3/mlx-dspark"                 # Tap for MLX DSpark
-tap "funstuie-bit/jukeboxcli", "https://github.com/funstuie-bit/JukeboxCli.git"   # Tap for Jukebox CLI
+tap "AlexsJones/llmfit", trusted: true                                                           # Formulae for Homebrew
+tap "aquasecurity/trivy", trusted: true                                                          # Tap for the Trivy security scanner
+tap "doganarif/tap", trusted: true                                                               # Formulae for Homebrew
+tap "fairwindsops/tap", trusted: true                                                            # Formulae for Homebrew
+tap "hashicorp/tap", trusted: true                                                               # Tap for Hashicorp tools
+tap "jundot/omlx", "https://github.com/jundot/omlx", trusted: true                               # Tap for omlx
+tap "lusingander/tap", trusted: true                                                             # Formulae for Homebrew
+tap "robusta-dev/homebrew-krr", trusted: true                                                    # Formulae for Homebrew
+tap "safedep/tap", trusted: true                                                                 # Tap for safedep
+tap "vladkens/tap", trusted: true                                                                # Formulae for Homebrew
+tap "anomalyco/tap", trusted: true                                                               # Formulae for Homebrew
+tap "terraform-linters/tap", trusted: true                                                       # Tap for TFLint
+tap "wxtsky/tap", trusted: true                                                                  # Formulae for Homebrew
+tap "kosmorro/tap", trusted: true                                                                # Formulae for Homebrew (Kosmorro)
+tap "ARahim3/mlx-dspark", "https://github.com/ARahim3/mlx-dspark", trusted: true                 # Tap for MLX DSpark
+tap "funstuie-bit/jukeboxcli", "https://github.com/funstuie-bit/JukeboxCli.git", trusted: true   # Tap for Jukebox CLI
 
 ## Fonts
 cask "font-iosevka-nerd-font"
@@ -182,7 +181,9 @@ brew "gifsicle"                                 # Tool for creating, manipulatin
 brew "graphviz"                                 # Open-source graph visualization software
 brew "imagemagick"                              # Software suite to create, edit, compose, or convert bitmap images
 brew "marp-cli"                                 # Markdown presentation ecosystem
+brew "mpv"                                      # Media player based on MPlayer and mplayer2
 brew "sdl2"                                     # Simple DirectMedia Layer
+brew "yt-dlp"                                   # Feature-rich command-line audio/video downloader
 brew "funstuie-bit/jukeboxcli/jukeboxcli"       # Jukebox CLI
 
 ## Security

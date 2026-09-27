@@ -68,8 +68,6 @@ function update --description "Update Neovim plugins, Homebrew packages, and sys
     or echo $red"✗ Spec-kit update failed"$normal
     echo
 
-    # Set Homebrew to not require tap trust to prevent bundle/cleanup failures
-    set -x HOMEBREW_NO_REQUIRE_TAP_TRUST 1
     # Disable interactive prompts during Homebrew operations
     set -x HOMEBREW_NO_ASK 1
 
@@ -96,14 +94,11 @@ function update --description "Update Neovim plugins, Homebrew packages, and sys
     and echo $green"✓ Packages upgraded"$normal
     or echo $red"✗ Package upgrade failed"$normal
 
-    # Check if brew-cask-upgrade is installed
-    if brew tap | grep -q buo/cask-upgrade
-        brew cu --all --yes --cleanup
-        and echo $green"✓ Casks upgraded"$normal
-        or echo $red"✗ Cask upgrade failed"$normal
-    else
-        echo $yellow"⚠ brew-cask-upgrade not installed (run: brew tap buo/cask-upgrade)"$normal
-    end
+    # Upgrade casks (including auto-updating casks)
+    echo $yellow"➤ Upgrading casks..."$normal
+    brew upgrade --cask --greedy-auto-updates
+    and echo $green"✓ Casks upgraded"$normal
+    or echo $red"✗ Cask upgrade failed"$normal
 
     brew cleanup --prune=all
     set -l cleanup_status $status
