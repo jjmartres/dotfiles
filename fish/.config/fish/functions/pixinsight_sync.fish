@@ -1,3 +1,6 @@
 function pixinsight_sync
-    rsync -avz ~/Personal/Astrophotography jjmartres@personal:/media/jjmartres/Astrophotography
+    rsync -avh --size-only --delete --info=progress2 \
+        --exclude=astrophotography/_Dbs/ \
+        ~/Personal/astrophotography/* \
+        personal:/media/jjmartres/Astrophotography/astrophotography/ 2>>~/.local/state/pixinsights_sync-errors.log
 end

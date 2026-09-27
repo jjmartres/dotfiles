@@ -2,26 +2,22 @@
 cask_args appdir: "/Applications"
 
 ## Taps
-tap "AlexsJones/llmfit"                         # Formulae for Homebrew
-tap "aquasecurity/trivy"                        # Tap for the Trivy security scanner
-tap "arimxyer/tap"                              # Formulae for Homebrew
-tap "buo/cask-upgrade"                          # Tap for the cask-upgrade tool
-tap "doganarif/tap"                             # Formulae for Homebrew
-tap "fairwindsops/tap"                          # Formulae for Homebrew
-tap "FelixKratz/formulae"                       # Formulae for Homebrew
-tap "gromgit/brewtils"                          # Formulae for Homebrew
-tap "hashicorp/tap"                             # Tap for Hashicorp tools
-tap "jundot/omlx", "https://github.com/jundot/omlx"       # Tap for omlx
-tap "koekeishiya/formulae"                      # Formulae for Homebrew
-tap "lusingander/tap"                           # Formulae for Homebrew
-tap "macos-fuse-t/homebrew-cask"                # Formulae for Homebrew
-tap "robusta-dev/homebrew-krr"                  # Formulae for Homebrew
-tap "rvarunrathod/tap"                          # Formulae for Homebrew
-tap "safedep/tap"                               # Tap for safedep
-tap "steipete/tap"                              # Formulae for Homebrew
-tap "vladkens/tap"                              # Formulae for Homebrew
-tap "anomalyco/tap"                             # Formulae for Homebrew
-tap "wxtsky/tap"                                # Formulae for Homebrew
+tap "AlexsJones/llmfit", trusted: true                                                           # Formulae for Homebrew
+tap "aquasecurity/trivy", trusted: true                                                          # Tap for the Trivy security scanner
+tap "doganarif/tap", trusted: true                                                               # Formulae for Homebrew
+tap "fairwindsops/tap", trusted: true                                                            # Formulae for Homebrew
+tap "hashicorp/tap", trusted: true                                                               # Tap for Hashicorp tools
+tap "jundot/omlx", "https://github.com/jundot/omlx", trusted: true                               # Tap for omlx
+tap "lusingander/tap", trusted: true                                                             # Formulae for Homebrew
+tap "robusta-dev/homebrew-krr", trusted: true                                                    # Formulae for Homebrew
+tap "safedep/tap", trusted: true                                                                 # Tap for safedep
+tap "vladkens/tap", trusted: true                                                                # Formulae for Homebrew
+tap "anomalyco/tap", trusted: true                                                               # Formulae for Homebrew
+tap "terraform-linters/tap", trusted: true                                                       # Tap for TFLint
+tap "wxtsky/tap", trusted: true                                                                  # Formulae for Homebrew
+tap "kosmorro/tap", trusted: true                                                                # Formulae for Homebrew (Kosmorro)
+tap "ARahim3/mlx-dspark", "https://github.com/ARahim3/mlx-dspark", trusted: true                 # Tap for MLX DSpark
+tap "funstuie-bit/jukeboxcli", "https://github.com/funstuie-bit/JukeboxCli.git", trusted: true   # Tap for Jukebox CLI
 
 ## Fonts
 cask "font-iosevka-nerd-font"
@@ -76,7 +72,6 @@ brew "sslscan"                                  # Tests SSL/TLS services to find
 brew "starship"                                 # Cross-shell prompt for any shell
 brew "stow"                                     # Manages symbolic links for package installation
 brew "superfile"                                # Terminal-based file manager
-brew "television"                               # A fast, portable and hackable fuzzy finder for the terminal
 brew "tree"                                     # Displays directory contents in a tree-like format
 brew "uni2ascii"                                # Converts Unicode strings to ASCII equivalents
 brew "vivid"                                    # Generator for the LS_COLORS environment variable
@@ -89,10 +84,7 @@ brew "zlib"                                     # Compression library
 brew "zoxide"                                   # Smarter cd command, learns your habits
 
 ## Improve macOS UI Experience
-#brew "borders" if OS.mac?                      # Lightweight tool to add colored borders to user windows
 brew "mole"                                     # Deep clean and optimize your Mac
-#brew "skhd" if OS.mac?                         # Simple hotkey daemon for macOS
-#brew "yabai" if OS.mac?                        # Yet Another Bouncer for macOS
 
 ## Versioning (Git)
 brew "diff-so-fancy"                            # Compare anything with git
@@ -128,6 +120,7 @@ brew "prettier"                                 # Opinionated code formatter
 brew "prettierd"                                # Opinionated code formatter (daemon)
 brew "pydantic"                                 # Data validation and settings management using Python type hints
 brew "python@3.11"                              # Required dependency for omlx
+brew "python@3.13"                              # Required dependency for gcloud-cli
 brew "rust"                                     # Systems programming language
 brew "tree-sitter-cli"                          # CLI tool for managing Tree-sitter parsers
 brew "uv"                                       # Fast Python package and project manager
@@ -170,14 +163,12 @@ brew "sipcalc"                                  # Simple IP calculator
 brew "skaffold"                                 # Easy and repeatable Kubernetes development
 brew "terraform-docs"                           # Generate documentation from Terraform modules
 brew "terraform-ls"                             # Language Server Protocol for Terraform
-brew "terraformer"                              # Generate tf/json and hcl from existing infrastructure
 brew "terrahelp"                                # Collection of helpful Terraform utilities
-brew "terrascan"                                # Static code analyzer for Infrastructure as Code
 brew "tfenv"                                    # Terraform version manager
-brew "tflint"                                   # Terraform linter
 brew "tfsec"                                    # Security scanner for Terraform code
 brew "colima"                                   # Container runtimes with minimal setup
 brew "docker"                                   # Docker command-line client
+# docker-completion removed — deprecated upstream; completions now bundled with docker formula
 brew "docker-compose"                           # Define and run multi-container applications
 brew "docker-buildx"                            # Docker CLI plugin for building and pushing container images
 
@@ -190,31 +181,38 @@ brew "gifsicle"                                 # Tool for creating, manipulatin
 brew "graphviz"                                 # Open-source graph visualization software
 brew "imagemagick"                              # Software suite to create, edit, compose, or convert bitmap images
 brew "marp-cli"                                 # Markdown presentation ecosystem
+brew "mpv"                                      # Media player based on MPlayer and mplayer2
+brew "sdl2"                                     # Simple DirectMedia Layer
+brew "yt-dlp"                                   # Feature-rich command-line audio/video downloader
+brew "funstuie-bit/jukeboxcli/jukeboxcli"       # Jukebox CLI
 
 ## Security
 brew "aquasecurity/trivy/trivy"                 # Simple and comprehensive vulnerability scanner
-brew "safedep/tap/vet"                          # Safely manage your dependencies
 
 ## AI
 brew "llmfit"                                   # Find which LLM models run on your hardware
-brew "anomalyco/tap/opencode"                   # AI coding agent built for the terminal
+#brew "anomalyco/tap/opencode"                   # AI coding agent built for the terminal -- v1
+brew "anomalyco/tap/opencode-v2"                # AI coding agent built for the terminal -- v2
 brew "pi-coding-agent"                          # Pi coding agent
 brew "omlx"                                     # Run AI models locally and privately using MLX
+brew "rtk"                                      # CLI proxy that reduces LLM token consumption by 60-90% on common dev commands
+
+## Astronomy
+brew "kosmorro"                                 # A program to calculate your ephemerides
 
 ## Cask Applications
 cask "cyberduck"                                # FTP, SFTP, WebDAV, S3, Azure, Google Drive and more
 cask "dbeaver-community"                        # Database management tool
-cask "discord"                                  # Chat with your friends
 cask "gcloud-cli"                               # Command-line tool for Google Cloud Platform
 cask "ghostty"                                  # Modern and customizable terminal emulator
 cask "gitkraken"                                # Cross-platform Git GUI client
 cask "gitkraken-cli"                            # Cross-platform Git CLI
 cask "hiddenbar"                                # Utility to hide menu bar icons
 cask "maccy"                                    # Clipboard manager
-cask "macos-fuse-t/homebrew-cask/fuse-t"        # FUSE for macOS in userspace
-cask "macos-fuse-t/homebrew-cask/fuse-t-sshfs"  # SSHFS via Fuse-T
 cask "musicbrainz-picard"                       # Music tagger powered by MusicBrainz
-cask "soulseek"                                 # P2P music sharing client
-cask "steam"                                    # Steam client
-cask "vlc"                                      # Cross-platform multimedia player
-cask "codeisland"                               # Real-time AI coding agent status panel for macOS Dynamic Island (Notch)
+#cask "soulseek"                                 # P2P music sharing client
+#cask "steam"                                    # Steam client
+#cask "codeisland"                               # Real-time AI coding agent status panel for macOS Dynamic Island (Notch)
+cask "terraform-linters/tap/tflint"             # Terraform linter
+cask "mlx-dspark"                               # MLX Spark
+cask "safedep/tap/vet"                          # Safely manage your dependencies

@@ -1,0 +1,15 @@
+// PixInsight update repositories
+// Generated on 2026-09-01 04:54:47 UTC
+https://pixinsight.deepskyforge.com/update/graxpert-process/
+https://www.cosmicphotons.com/pi-scripts/imageblend/
+https://www.cosmicphotons.com/pi-modules/narrowbandnormalization/
+https://www.cosmicphotons.com/pi-scripts/colormask/
+https://www.cosmicphotons.com/pi-scripts/starreduction/
+https://www.cosmicphotons.com/pi-scripts/drawannotation/
+https://www.cosmicphotons.com/pi-scripts/bfke/
+https://www.ghsastro.co.uk/updates/
+https://pixinsight.astroprocessing.com/
+https://dbxtract.astrocitas.com/
+https://www.cosmicphotons.com/pi-scripts/nbcolourmapper/
+https://updates.setiastro.com/
+https://www.rc-astro.com/PixInsight

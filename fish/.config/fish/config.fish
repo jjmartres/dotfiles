@@ -55,3 +55,11 @@ end
 
 # Initialize zoxide
 zoxide init fish | source
+
+# Shorten $HOME to ~ in zoxide interactive completions
+if test -f "$__fish_config_dir/functions/__zoxide_z_complete.fish"
+    . "$__fish_config_dir/functions/__zoxide_z_complete.fish"
+end
+if test -f "$__fish_config_dir/functions/__zoxide_zi.fish"
+    . "$__fish_config_dir/functions/__zoxide_zi.fish"
+end
