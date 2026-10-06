@@ -96,6 +96,7 @@ brew "glab"                                     # GitLab CLI
 brew "lazygit"                                  # Simple terminal UI for git commands
 brew "mercurial"                                # Distributed revision control system
 brew "serie"                                    # A rich git commit graph in your terminal
+brew "tuicr"                                    # Code review in your terminal
 
 ## Development Tools
 brew "asdf"                                     # Extendable version manager with support for Ruby, Node.js, Elixir, Erlang & more
@@ -191,7 +192,6 @@ brew "aquasecurity/trivy/trivy"                 # Simple and comprehensive vulne
 
 ## AI
 brew "llmfit"                                   # Find which LLM models run on your hardware
-#brew "anomalyco/tap/opencode"                   # AI coding agent built for the terminal -- v1
 brew "anomalyco/tap/opencode-v2"                # AI coding agent built for the terminal -- v2
 brew "pi-coding-agent"                          # Pi coding agent
 brew "omlx"                                     # Run AI models locally and privately using MLX
@@ -214,5 +214,5 @@ cask "musicbrainz-picard"                       # Music tagger powered by MusicB
 #cask "steam"                                    # Steam client
 #cask "codeisland"                               # Real-time AI coding agent status panel for macOS Dynamic Island (Notch)
 cask "terraform-linters/tap/tflint"             # Terraform linter
-cask "mlx-dspark"                               # MLX Spark
+#cask "mlx-dspark"                               # MLX Spark
 cask "safedep/tap/vet"                          # Safely manage your dependencies
