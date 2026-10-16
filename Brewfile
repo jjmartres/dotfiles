@@ -151,7 +151,7 @@ brew "k9s"                                      # Kubernetes CLI to manage your 
 brew "k9sight"                                  # Fast, keyboard-driven TUI for debugging Kubernetes workloads
 brew "kubebuilder"                              # CLI tool for building Kubernetes APIs
 brew "kubecolor"                                # Add colors to kubectl output
-brew "kubectx"                                  # Tool to switch between Kubernetes contexts
+brew "kubie"                                    # Much more powerful alternative to kubectx and kubens
 brew "kubectl"                                  # Kubernetes CLI tool
 brew "kustomize"                                # Kubernetes native configuration management
 brew "mongodb-atlas"                            # MongoDB Atlas CLI
