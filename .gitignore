@@ -3,7 +3,8 @@
 Brewfile.lock.json
 btop/.config/btop/btop.log
 fish/.config/fish/conf.d/101_secrets_exports.fish
-fish/.config/fish/conf.d/200_jira_abbrevations.fish
+fish/.config/fish/conf.d/601_fintecture_jira_abbrevations.fish
+fish/.config/fish/functions/farnsworth.fish
 fish/.config/fish/functions/gcloud_config_generate.fish
 git/*
 k9s/.config/k9s/clusters/*

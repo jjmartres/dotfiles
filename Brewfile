@@ -100,6 +100,7 @@ brew "tuicr"                                    # Code review in your terminal
 
 ## Development Tools
 brew "asdf"                                     # Extendable version manager with support for Ruby, Node.js, Elixir, Erlang & more
+brew "mise"                                     # Polyglot runtime manager (asdf rust clone)
 brew "atac"                                     # A terminal client for the API
 brew "cmake"                                    # Cross-platform build system generator
 brew "csvkit"                                   # A suite of command-line tools for converting to and working with CSV
@@ -131,7 +132,7 @@ brew "yq"                                       # Portable command-line YAML pro
 ## For Reachy Mini
 brew "gobject-introspection"                    # GObject introspection tools
 brew "gstreamer"                                # GStreamer Multimedia Framework
-brew "huggingface-cli"                          # CLI for Hugging Face models
+brew "hf"                                       # Hugging Face CLI
 brew "libnice-gstreamer"                        # ICE library for GStreamer
 brew "pkg-config"                               # Package management tool for libraries
 
@@ -216,3 +217,7 @@ cask "musicbrainz-picard"                       # Music tagger powered by MusicB
 cask "terraform-linters/tap/tflint"             # Terraform linter
 #cask "mlx-dspark"                               # MLX Spark
 cask "safedep/tap/vet"                          # Safely manage your dependencies
+cask "pdfcraft"                                 # Reading, organizing and protecting PDFs · you are here
+cask "photocraft"                               # Image editing: layers, masks, type and real PSD files
+cask "lightcraft"                               # Photo library and raw development
+cask "vectorcraft"                              # Vector illustration
