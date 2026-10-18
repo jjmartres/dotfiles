@@ -1,4 +1,5 @@
 .DS_Store
+.worktree/
 Brewfile.lock.json
 btop/.config/btop/btop.log
 fish/.config/fish/conf.d/101_secrets_exports.fish
