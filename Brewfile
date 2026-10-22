@@ -100,7 +100,6 @@ brew "tuicr"                                    # Code review in your terminal
 
 ## Development Tools
 brew "asdf"                                     # Extendable version manager with support for Ruby, Node.js, Elixir, Erlang & more
-brew "mise"                                     # Polyglot runtime manager (asdf rust clone)
 brew "atac"                                     # A terminal client for the API
 brew "cmake"                                    # Cross-platform build system generator
 brew "csvkit"                                   # A suite of command-line tools for converting to and working with CSV
@@ -128,6 +127,7 @@ brew "tree-sitter-cli"                          # CLI tool for managing Tree-sit
 brew "uv"                                       # Fast Python package and project manager
 brew "worktrunk"                                # CLI for git worktree management, designed for running AI agents in parallel
 brew "yq"                                       # Portable command-line YAML processor
+brew "herdr"                                    # The runtime coding agents
 
 ## For Reachy Mini
 brew "gobject-introspection"                    # GObject introspection tools
