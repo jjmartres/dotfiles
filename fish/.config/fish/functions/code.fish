@@ -26,6 +26,7 @@ function code --description "Pick a repository under a path with fzf and open nv
         echo ""
         echo "$bold Options:$normal"
         echo "  --refresh   Force rebuild of the repository cache before opening picker"
+        echo "  --herdr     Open repository in a Herdr workspace (agent fw + vim + terminal)"
         echo ""
         echo "$bold Environment variables:$normal"
         echo "  CODE_CACHE_DIR        Cache directory  (current: $cache_dir)"
@@ -49,11 +50,14 @@ function code --description "Pick a repository under a path with fzf and open nv
 
     # Parse flags
     set -l force_refresh false
+    set -l use_herdr false
     set -l positional
     for arg in $argv
         switch $arg
             case --refresh
                 set force_refresh true
+            case --herdr
+                set use_herdr true
             case '*'
                 set -a positional $arg
         end
@@ -170,6 +174,8 @@ function code --description "Pick a repository under a path with fzf and open nv
     if test -n "$nvim_job"
         echo "$green→$normal Found backgrounded Neovim (job $nvim_job) — bringing to foreground"
         fg %$nvim_job
+    else if set -q HERDR_ENV; or test "$use_herdr" = true
+        hw $repo_path
     else if set -q GHOSTTY_RESOURCES_DIR
         # Inside Ghostty: check if a tab for this repo already exists
         set -l existing_tabs (osascript -e 'tell application "Ghostty" to get name of tabs of window 1' 2>/dev/null)
