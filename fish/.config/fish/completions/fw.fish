@@ -1,0 +1,1 @@
+/Users/jjmartres/Repositories/perso/farnswrth/completions/fw.fish
