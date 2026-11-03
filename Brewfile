@@ -128,6 +128,7 @@ brew "uv"                                       # Fast Python package and projec
 brew "worktrunk"                                # CLI for git worktree management, designed for running AI agents in parallel
 brew "yq"                                       # Portable command-line YAML processor
 brew "herdr"                                    # The runtime coding agents
+brew "tuios"                                    # A terminal window manager that knows what your agents are doing
 
 ## For Reachy Mini
 brew "gobject-introspection"                    # GObject introspection tools
