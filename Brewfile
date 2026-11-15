@@ -1,5 +1,5 @@
 ## Configure where our applications go
-cask_args appdir: "/Applications"
+cask_args appdir: "/Applications" if OS.mac?
 
 ## Taps
 tap "AlexsJones/llmfit", trusted: true                                                           # Formulae for Homebrew
@@ -7,7 +7,7 @@ tap "aquasecurity/trivy", trusted: true                                         
 tap "doganarif/tap", trusted: true                                                               # Formulae for Homebrew
 tap "fairwindsops/tap", trusted: true                                                            # Formulae for Homebrew
 tap "hashicorp/tap", trusted: true                                                               # Tap for Hashicorp tools
-tap "jundot/omlx", "https://github.com/jundot/omlx", trusted: true                               # Tap for omlx
+tap "jundot/omlx", "https://github.com/jundot/omlx", trusted: true if OS.mac?                    # Tap for omlx
 tap "lusingander/tap", trusted: true                                                             # Formulae for Homebrew
 tap "robusta-dev/homebrew-krr", trusted: true                                                    # Formulae for Homebrew
 tap "safedep/tap", trusted: true                                                                 # Tap for safedep
@@ -17,7 +17,7 @@ tap "terraform-linters/tap", trusted: true                                      
 tap "wxtsky/tap", trusted: true                                                                  # Formulae for Homebrew
 tap "kosmorro/tap", trusted: true                                                                # Formulae for Homebrew (Kosmorro)
 tap "ARahim3/mlx-dspark", "https://github.com/ARahim3/mlx-dspark", trusted: true                 # Tap for MLX DSpark
-tap "funstuie-bit/jukeboxcli", "https://github.com/funstuie-bit/JukeboxCli.git", trusted: true   # Tap for Jukebox CLI
+tap "funstuie-bit/jukeboxcli", "https://github.com/funstuie-bit/JukeboxCli.git", trusted: true if OS.mac? # Tap for Jukebox CLI
 
 ## Fonts
 cask "font-iosevka-nerd-font"
@@ -53,14 +53,14 @@ brew "gnutls"                                   # GNU Transport Layer Security l
 brew "go-task"                                  # Task runner / simpler Make alternative written in Go
 brew "grep"                                     # Command-line utility for searching plain-text data sets
 brew "httpie"                                   # Command line HTTP client
-brew "macmon"                                   # Monitor CPU, memory, network, disk, and process activity on your Mac
+brew "macmon" if OS.mac?                        # Monitor CPU, memory, network, disk, and process activity on your Mac
 brew "moreutils"                                # Additional Unix utilities
 brew "nmap"                                     # Network exploration tool and security scanner
 brew "nushell"                                  # Modern shell for the GitHub era
 brew "openssh"                                  # OpenBSD Secure Shell tools (ssh, scp, etc.)
 brew "pstree"                                   # Displays running processes as a tree
 brew "readline"                                 # Library for interactive command-line editing
-brew "rename"                                   # Utility for batch renaming files
+brew "rename" if OS.mac?                        # Utility for batch renaming files
 brew "ripgrep"                                  # Line-oriented search tool that recursively searches directories
 brew "rlwrap"                                   # Adds readline input editing to other utilities
 brew "rsync"                                    # Utility for synchronizing files and directories
@@ -84,7 +84,7 @@ brew "zlib"                                     # Compression library
 brew "zoxide"                                   # Smarter cd command, learns your habits
 
 ## Improve macOS UI Experience
-brew "mole"                                     # Deep clean and optimize your Mac
+brew "mole" if OS.mac?                          # Deep clean and optimize your Mac
 
 ## Versioning (Git)
 brew "diff-so-fancy"                            # Compare anything with git
@@ -185,9 +185,9 @@ brew "graphviz"                                 # Open-source graph visualizatio
 brew "imagemagick"                              # Software suite to create, edit, compose, or convert bitmap images
 brew "marp-cli"                                 # Markdown presentation ecosystem
 brew "mpv"                                      # Media player based on MPlayer and mplayer2
-brew "sdl2"                                     # Simple DirectMedia Layer
+brew "sdl2-compat"                              # Simple DirectMedia Layer
 brew "yt-dlp"                                   # Feature-rich command-line audio/video downloader
-brew "funstuie-bit/jukeboxcli/jukeboxcli"       # Jukebox CLI
+brew "funstuie-bit/jukeboxcli/jukeboxcli" if OS.mac? # Jukebox CLI
 
 ## Security
 brew "aquasecurity/trivy/trivy"                 # Simple and comprehensive vulnerability scanner
@@ -196,7 +196,7 @@ brew "aquasecurity/trivy/trivy"                 # Simple and comprehensive vulne
 brew "llmfit"                                   # Find which LLM models run on your hardware
 brew "anomalyco/tap/opencode-v2"                # AI coding agent built for the terminal -- v2
 brew "pi-coding-agent"                          # Pi coding agent
-brew "omlx"                                     # Run AI models locally and privately using MLX
+brew "omlx" if OS.mac?                          # Run AI models locally and privately using MLX
 brew "rtk"                                      # CLI proxy that reduces LLM token consumption by 60-90% on common dev commands
 
 ## Astronomy
