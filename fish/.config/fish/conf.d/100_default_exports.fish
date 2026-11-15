@@ -69,7 +69,7 @@ set -gx FZF_ALT_C_OPTS " \
   --walker-skip .git,node_modules,target \
   --preview 'tree -C {}'"
 
-set -gx EDITOR /opt/homebrew/bin/nvim
+set -gx EDITOR nvim
 
 set -gx KUBE_CONFIG nvim
 

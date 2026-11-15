@@ -49,8 +49,8 @@ set -gx EZA_COLORS (vivid generate $DEFAULT_THEME)
 complete -c spinnaker -w spin
 
 # The next line updates PATH for the Google Cloud SDK.
-if [ -f '/opt/homebrew/share/google-cloud-sdk/path.fish.inc' ]
-    . '/opt/homebrew/share/google-cloud-sdk/path.fish.inc'
+if [ -f "$HOMEBREW_PREFIX/share/google-cloud-sdk/path.fish.inc" ]
+    . "$HOMEBREW_PREFIX/share/google-cloud-sdk/path.fish.inc"
 end
 
 # Initialize zoxide
