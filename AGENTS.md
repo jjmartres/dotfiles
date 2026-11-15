@@ -87,7 +87,7 @@ update   # nvim plugins → Mason → CLT → asdf → brew bundle → brew upgr
 
 ## Shell Environment
 
-- **Shell**: Fish (`/opt/homebrew/bin/fish`)
+- **Shell**: Fish 4.x from Homebrew (`/opt/homebrew/bin/fish` on macOS, `/home/linuxbrew/.linuxbrew/bin/fish` on Linux)
 - **Always use Fish syntax** — no bashisms
 - **Forbidden**: `export`, `source`, `$()` subshells (use `(cmd)`), `[[`, `&&`/`||` (use `; and`/`; or`)
 - **Prompt**: Starship — theme driven by `$DEFAULT_THEME`
