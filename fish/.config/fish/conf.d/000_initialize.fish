@@ -9,9 +9,15 @@ set --erase brew_bin
 
 # Set default theme
 set -gx DEFAULT_THEME catppuccin-latte
+set -l cosmic_dark_file $HOME/.config/cosmic/com.system76.CosmicTheme.Mode/v1/is_dark
 if type -q defaults
     defaults read -g AppleInterfaceStyle &>/dev/null
     if test $status -eq 0
+        set -gx DEFAULT_THEME catppuccin-macchiato
+    end
+else if test -r $cosmic_dark_file
+    # COSMIC desktop (Pop!_OS 24.04+) — plain file, works without a D-Bus session
+    if test (string trim < $cosmic_dark_file) = true
         set -gx DEFAULT_THEME catppuccin-macchiato
     end
 else if type -q gsettings

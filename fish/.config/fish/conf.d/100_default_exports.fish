@@ -6,7 +6,11 @@ else if test -d /opt/homebrew # MacOS
     set -gx HOMEBREW_PREFIX /opt/homebrew
 end
 
-$HOMEBREW_PREFIX/bin/yq -i ".k9s.ui.skin = \"$DEFAULT_THEME\"" $K9S_CONFIG_DIR/config.yaml
+# Sync k9s skin with the system theme — interactive shells only: non-interactive
+# runs (cron `update --unattended`) can't detect dark mode and would reset it
+if status is-interactive; and test -x $HOMEBREW_PREFIX/bin/yq
+    $HOMEBREW_PREFIX/bin/yq -i ".k9s.ui.skin = \"$DEFAULT_THEME\"" $K9S_CONFIG_DIR/config.yaml
+end
 
 # FZF THEME
 set -gx FZF_DEFAULT_OPTS_CATPUCCIN_LATTE " \
