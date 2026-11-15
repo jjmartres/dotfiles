@@ -2,6 +2,8 @@ function update --description "Update Neovim plugins, Homebrew packages, and sys
     set -l dotfiles_path "$HOME/Repositories/perso/dotfiles"
     set -l os (uname)
     set -l failed
+    set -l mode default
+    set -l unattended 0
 
     # Color codes for better readability
     set -l green (set_color green)
@@ -10,8 +12,41 @@ function update --description "Update Neovim plugins, Homebrew packages, and sys
     set -l red (set_color red)
     set -l normal (set_color normal)
 
-    # Check if 'os' argument is passed
-    if test (count $argv) -gt 0; and test "$argv[1]" = "os"
+    for arg in $argv
+        switch $arg
+            case os
+                set mode os
+            case --unattended
+                set unattended 1
+            case -h --help
+                echo "Usage: update [os] [--unattended]"
+                echo "  os            Install OS updates and reboot"
+                echo "  --unattended  Never prompt (for cron): skip sudo steps unless sudo works without a password"
+                return 0
+            case '*'
+                echo $red"✗ Unknown argument: $arg"$normal
+                return 1
+        end
+    end
+
+    if test $mode = os; and test $unattended -eq 1
+        echo $red"✗ 'update os' reboots the machine and cannot run unattended"$normal
+        return 1
+    end
+
+    # sudo strategy: interactive by default; in unattended mode only use
+    # sudo if it works without a password (e.g. NOPASSWD sudoers rule)
+    set -l can_sudo 1
+    set -l sudo_cmd sudo
+    if test $unattended -eq 1
+        set sudo_cmd sudo -n
+        if not sudo -n true 2>/dev/null
+            set can_sudo 0
+        end
+    end
+
+    # OS updates + reboot
+    if test $mode = os
         echo $blue"═══════════════════════════════════════"$normal
         echo $blue"  Installing OS Updates and Restarting"$normal
         echo $blue"═══════════════════════════════════════"$normal
@@ -45,7 +80,7 @@ function update --description "Update Neovim plugins, Homebrew packages, and sys
     end
 
     echo $blue"═══════════════════════════════════════"$normal
-    echo $blue"  Starting System Update"$normal
+    echo $blue"  Starting System Update ("(date '+%Y-%m-%d %H:%M')")"$normal
     echo $blue"═══════════════════════════════════════"$normal
     echo
 
@@ -76,30 +111,38 @@ function update --description "Update Neovim plugins, Homebrew packages, and sys
         case Darwin
             echo $yellow"➤ Checking Command Line Tools..."$normal
             if softwareupdate --list | grep -q "Command Line Tools"
-                sudo softwareupdate --install "Command Line Tools for Xcode"
-                and echo $green"✓ Command Line Tools updated"$normal
-                or begin
-                    echo $red"✗ Command Line Tools update failed"$normal
-                    set -a failed "Command Line Tools"
+                if test $can_sudo -eq 1
+                    $sudo_cmd softwareupdate --install "Command Line Tools for Xcode"
+                    and echo $green"✓ Command Line Tools updated"$normal
+                    or begin
+                        echo $red"✗ Command Line Tools update failed"$normal
+                        set -a failed "Command Line Tools"
+                    end
+                else
+                    echo $yellow"⚠ Command Line Tools update available — skipped (sudo needs a password)"$normal
                 end
             else
                 echo $green"✓ Command Line Tools already up to date"$normal
             end
         case Linux
-            echo $yellow"➤ Updating APT packages..."$normal
-            sudo apt update
-            and sudo apt upgrade -y
-            and sudo apt autoremove --purge -y
-            and echo $green"✓ APT packages updated"$normal
-            or begin
-                echo $red"✗ APT update failed"$normal
-                set -a failed "APT"
+            if test $can_sudo -eq 1
+                echo $yellow"➤ Updating APT packages..."$normal
+                $sudo_cmd apt update
+                and $sudo_cmd env DEBIAN_FRONTEND=noninteractive apt upgrade -y
+                and $sudo_cmd env DEBIAN_FRONTEND=noninteractive apt autoremove --purge -y
+                and echo $green"✓ APT packages updated"$normal
+                or begin
+                    echo $red"✗ APT update failed"$normal
+                    set -a failed "APT"
+                end
+            else
+                echo $yellow"⚠ APT skipped (sudo needs a password)"$normal
             end
 
             if type -q flatpak
                 echo $yellow"➤ Updating Flatpak apps..."$normal
-                flatpak update -y
-                and flatpak uninstall --unused -y
+                flatpak update -y --noninteractive
+                and flatpak uninstall --unused -y --noninteractive
                 and echo $green"✓ Flatpak apps updated"$normal
                 or begin
                     echo $red"✗ Flatpak update failed"$normal
@@ -108,12 +151,16 @@ function update --description "Update Neovim plugins, Homebrew packages, and sys
             end
 
             if type -q snap
-                echo $yellow"➤ Updating Snap packages..."$normal
-                sudo snap refresh
-                and echo $green"✓ Snap packages updated"$normal
-                or begin
-                    echo $red"✗ Snap update failed"$normal
-                    set -a failed "Snap"
+                if test $can_sudo -eq 1
+                    echo $yellow"➤ Updating Snap packages..."$normal
+                    $sudo_cmd snap refresh
+                    and echo $green"✓ Snap packages updated"$normal
+                    or begin
+                        echo $red"✗ Snap update failed"$normal
+                        set -a failed "Snap"
+                    end
+                else
+                    echo $yellow"⚠ Snap skipped (sudo needs a password)"$normal
                 end
             end
     end
