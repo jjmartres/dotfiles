@@ -25,4 +25,4 @@ alias finder spf
 alias meet 'yabai -m rule --apply app="Chrome" space=2'
 alias unmeet 'yabai -m rule --apply app="Chrome" space=6'
 
-alias oc /opt/homebrew/bin/opencode
+alias oc opencode

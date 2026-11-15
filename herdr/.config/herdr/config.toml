@@ -42,7 +42,7 @@ accent = "#7287fd"           # Latte lavender
 overlay0 = "#8c8fa1"         # Séparateur spaces/agents Latte contrasté
 
 [terminal]
-default_shell = "/opt/homebrew/bin/fish"
+default_shell = ""                # Empty = $SHELL (login shell) — portable across macOS/Linux
 shell_mode = "auto"
 new_cwd = "follow"
 kitty_graphics = true
