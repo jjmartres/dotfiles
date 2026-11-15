@@ -222,3 +222,5 @@ cask "pdfcraft"                                 # Reading, organizing and protec
 cask "photocraft"                               # Image editing: layers, masks, type and real PSD files
 cask "lightcraft"                               # Photo library and raw development
 cask "vectorcraft"                              # Vector illustration
+cask "android-platform-tools"                   # Android Platform Tools
+cask "claude-code@latest"                       # Claude Code
