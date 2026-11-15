@@ -210,6 +210,7 @@ cask "ghostty"                                  # Modern and customizable termin
 cask "gitkraken"                                # Cross-platform Git GUI client
 cask "gitkraken-cli"                            # Cross-platform Git CLI
 cask "hiddenbar"                                # Utility to hide menu bar icons
+cask "keymapp"                                  # ZSA keyboard firmware flasher (Voyager)
 cask "maccy"                                    # Clipboard manager
 cask "musicbrainz-picard"                       # Music tagger powered by MusicBrainz
 #cask "soulseek"                                 # P2P music sharing client
