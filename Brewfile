@@ -214,6 +214,7 @@ cask "hiddenbar"                                # Utility to hide menu bar icons
 cask "keymapp"                                  # ZSA keyboard firmware flasher (Voyager)
 cask "maccy"                                    # Clipboard manager
 cask "musicbrainz-picard"                       # Music tagger powered by MusicBrainz
+cask "psysonic"                                 # Desktop client for Navidrome and Subsonic-compatible servers
 #cask "soulseek"                                 # P2P music sharing client
 #cask "steam"                                    # Steam client
 #cask "codeisland"                               # Real-time AI coding agent status panel for macOS Dynamic Island (Notch)
