@@ -192,6 +192,7 @@ brew "funstuie-bit/jukeboxcli/jukeboxcli" if OS.mac? # Jukebox CLI
 
 ## Security
 brew "aquasecurity/trivy/trivy"                 # Simple and comprehensive vulnerability scanner
+brew "tailscale"                                # Easiest, most secure way to use WireGuard and 2FA
 
 ## AI
 brew "llmfit"                                   # Find which LLM models run on your hardware
