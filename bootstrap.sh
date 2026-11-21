@@ -19,4 +19,9 @@ case $OS in
 	;;
 esac
 
-stow --dir=$(pwd) --target=$HOME */
+sh ./stow.sh
+
+# post-stow hooks (need the stowed files in $HOME)
+for s in bootstrap.d/post-stow/*.sh; do
+	[ -f "$s" ] && sh "$s"
+done
