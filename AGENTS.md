@@ -8,13 +8,15 @@ Personal dotfiles repository managed with **GNU Stow**.
 
 ## Repository Structure
 
-Every top-level directory is a **Stow package**. Its internal layout mirrors `$HOME`, so `stow */` symlinks each package into `$HOME`.
+Every top-level directory is a **Stow package**, except those listed in `NON_PACKAGES` in `stow.sh` (`bootstrap.d`, `nix`, `pixinsight`). A package's internal layout mirrors `$HOME`; `sh ./stow.sh` symlinks every package into `$HOME`.
 
 ```
 dotfiles/
-├── bootstrap.sh              # Entry point: dispatches by OS, then stow */
+├── bootstrap.sh              # Entry point: dispatches by OS, then stow.sh, then post-stow hooks
+├── stow.sh                   # Stows every package (skips NON_PACKAGES); extra args go to stow
 ├── bootstrap.d/darwin/       # macOS bootstrap scripts (numbered, run in order)
 ├── bootstrap.d/linux/        # Linux bootstrap scripts
+├── bootstrap.d/post-stow/    # Hooks run after stow (need the stowed files in $HOME)
 ├── Brewfile                  # Declarative package manifest — source of truth
 ├── .stowrc                   # target=$HOME; ignore patterns
 ├── .pre-commit-config.yaml   # YAML lint, EOF, trailing-whitespace checks
@@ -37,14 +39,17 @@ dotfiles/
 sh ./bootstrap.sh
 
 # Deploy all symlinks (after editing configs)
-stow --dir=(pwd) --target=$HOME */
+sh ./stow.sh
 
 # Restow a single package after changes
 stow -R fish
 stow -R nvim
 
 # Simulate before deploying (dry-run)
-stow --simulate --dir=(pwd) --target=$HOME */
+sh ./stow.sh --simulate -v
+
+# A new top-level directory that is not a package (data, scripts):
+# add it to NON_PACKAGES in stow.sh — .stowrc --ignore cannot skip a package
 ```
 
 ### Brewfile Management

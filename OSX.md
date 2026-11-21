@@ -94,6 +94,43 @@ When Xcode and compilers break, re-install the command line tools.
 sudo rm -rf /Library/Developer/CommandLineTools
 sudo xcode-select --install
 ```
+
+## System stats (sysstats)
+
+Local history of CPU / RAM / disk load, top processes and biggest folders, with HTML reports.
+Package `sysstats/` (script `~/.local/bin/sysstats`, stdlib Python, system `/usr/bin/python3`)
+and fish function `sysreport` (with completion).
+
+- Every 5 min (`local.sysstats.collect`): load, CPU, RAM, swap, disk, top 25 processes, and the
+  process tree (pid/ppid, user, state, threads, full command; CPU measured from the CPU time used
+  between samples). Significant processes are kept with their whole parent chain (30 days).
+  Also battery (charge, AC, temperature, voltage, current, cycles, health, adapter) from `ioreg`,
+  and CPU/GPU temperatures, fan speed and power draw from `macmon` (Brewfile; skipped if missing).
+- Daily at 23:55 (`local.sysstats.daily`): folder size scan + report of the day.
+- Data: `~/.local/share/sysstats/` (`stats.db`, `reports/`, `*.log`), kept 90 days.
+- Report: Catppuccin Latte / Macchiato, key figures, charts, rankings, biggest folders, and an
+  htop/btop-like process explorer: parent → child tree with subtree totals (Σ), period or
+  snapshot mode (slider, or click a chart), sort, filter, per-process detail with sparklines.
+  Energy section: battery (with AC bands), temperatures, power (W) and fans.
+
+`bootstrap.sh` enables it automatically (post-stow hook). On an existing machine:
+
+```fish
+stow -R sysstats fish
+sysreport install        # writes and loads the launchd agents
+```
+
+```fish
+sysreport                # report of the last 24 h (opens it)
+sysreport --days 7       # or --hours N, --date YYYY-MM-DD, --no-open
+sysreport last           # last runs and launchd state
+sysreport open           # open the reports folder
+sysreport latest         # open the latest report
+sysreport uninstall      # remove the launchd agents (keeps the data)
+```
+
+macOS may ask once to let `python3` access Documents / Desktop / Downloads during the folder scan.
+
 ## License
 
 MIT / BSD

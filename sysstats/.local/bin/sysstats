@@ -1,0 +1,1080 @@
+#!/usr/bin/python3
+"""sysstats — historique local CPU / RAM / disque / process / dossiers, rapports HTML.
+
+  sysstats collect              échantillon (launchd, toutes les 5 min)
+  sysstats du                   scan des plus gros dossiers (launchd, 1x/jour)
+  sysstats daily                du + rapport du jour (launchd, 23:55)
+  sysstats report [--date AAAA-MM-JJ | --hours N | --days N] [--no-open]
+  sysstats status               état de la collecte et derniers runs
+  sysstats install | uninstall  active / retire les tâches launchd (macOS)
+"""
+import argparse
+import datetime as dt
+import html
+import json
+import os
+import re
+import shutil
+import sqlite3
+import subprocess
+import sys
+import time
+
+HOME = os.path.expanduser("~")
+BASE = os.path.join(HOME, ".local", "share", "sysstats")
+DB = os.path.join(BASE, "stats.db")
+REPORTS = os.path.join(BASE, "reports")
+RETENTION_DAYS = 90
+TREE_RETENTION_DAYS = 30  # détail par process (arbre), plus volumineux
+TREE_MIN_CPU = 0.5        # % d'un cœur : en dessous, un process n'est gardé que comme parent
+TREE_MIN_RSS = 50 << 20   # 50 Mo
+TOP_N = 25
+DU_MIN_KB = 200 * 1024  # on ne garde que les dossiers >= 200 Mo
+DU_TARGETS = [(HOME, 3), ("/Applications", 1), ("/opt/homebrew", 2), ("/Library", 1)]
+INTERPRETERS = {"python", "python3", "Python", "node", "ruby", "perl", "bash", "sh", "zsh", "fish", "bun", "deno", "java"}
+
+
+def sh(args, timeout=60):
+    try:
+        env = dict(os.environ, LC_ALL="C", LANG="C")  # dates et nombres de ps/top en format fixe
+        return subprocess.run(args, capture_output=True, text=True, timeout=timeout, env=env).stdout
+    except Exception:
+        return ""
+
+
+def db():
+    os.makedirs(BASE, exist_ok=True)
+    c = sqlite3.connect(DB, timeout=30)
+    c.executescript("""
+    CREATE TABLE IF NOT EXISTS samples(ts INTEGER PRIMARY KEY, load1 REAL, load5 REAL, load15 REAL,
+      cpu_user REAL, cpu_sys REAL, ncpu INTEGER, mem_total INTEGER, mem_used INTEGER, mem_compressed INTEGER,
+      mem_wired INTEGER, mem_free_pct INTEGER, swap_used INTEGER, swap_total INTEGER, disk_total INTEGER, disk_used INTEGER);
+    CREATE TABLE IF NOT EXISTS procs(ts INTEGER, name TEXT, cpu REAL, rss INTEGER, n INTEGER);
+    CREATE INDEX IF NOT EXISTS procs_ts ON procs(ts);
+    CREATE TABLE IF NOT EXISTS dirs(day TEXT, path TEXT, kb INTEGER, PRIMARY KEY(day, path));
+    CREATE TABLE IF NOT EXISTS runs(job TEXT PRIMARY KEY, ts INTEGER, ok INTEGER, detail TEXT);
+    CREATE TABLE IF NOT EXISTS pinfo(pkey TEXT PRIMARY KEY, pid INTEGER, ppkey TEXT, ppid INTEGER, user TEXT,
+      start INTEGER, exe TEXT, args TEXT, label TEXT, first INTEGER, last INTEGER);
+    CREATE TABLE IF NOT EXISTS psamp(ts INTEGER, pkey TEXT, cpu REAL, pcpu REAL, rss INTEGER, th INTEGER, state TEXT);
+    CREATE INDEX IF NOT EXISTS psamp_ts ON psamp(ts);
+    CREATE TABLE IF NOT EXISTS cpu_last(pkey TEXT PRIMARY KEY, cputime REAL, ts INTEGER);
+    CREATE TABLE IF NOT EXISTS sysextra(ts INTEGER PRIMARY KEY, nprocs INTEGER, nthreads INTEGER);
+    CREATE TABLE IF NOT EXISTS power(ts INTEGER PRIMARY KEY, bat_pct INTEGER, charging INTEGER, plugged INTEGER,
+      bat_temp REAL, bat_volt REAL, bat_amp REAL, bat_w REAL, cycles INTEGER, health REAL, raw_max INTEGER,
+      design INTEGER, adapter_w INTEGER, cpu_temp REAL, gpu_temp REAL, fan_rpm INTEGER, fan_max INTEGER,
+      sys_w REAL, cpu_w REAL, gpu_w REAL);
+    """)
+    return c
+
+
+# ---------------------------------------------------------------- collecte
+
+def proc_label(command):
+    parts = command.split()
+    exe = parts[0] if parts else command
+    m = re.match(r"(.*?/([^/]+)\.app)/", command)
+    base = os.path.basename(exe)
+    if re.sub(r"[\d.]+$", "", base) in INTERPRETERS or base in INTERPRETERS:
+        interp = re.sub(r"[\d.]+$", "", base).lower()
+        if len(parts) > 2 and parts[1] in ("-c", "-m"):
+            return f"{interp} {parts[1]} {os.path.basename(parts[2]) if parts[1] == '-m' else ''}".strip()[:60]
+        for a in parts[1:]:
+            if not a.startswith("-"):
+                interp = re.sub(r"[\d.]+$", "", base).lower()
+                return f"{interp}: {os.path.basename(a)}"[:60]
+        return base
+    if m and not m.group(2).startswith("Python"):
+        return m.group(2)
+    return base[:60] or "?"
+
+
+def cpu_seconds(s):
+    """Temps CPU de ps : [jj-][hh:]mm:ss.cc"""
+    days = 0
+    if "-" in s:
+        d, s = s.split("-", 1)
+        days = int(d)
+    sec = 0.0
+    for part in s.split(":"):
+        sec = sec * 60 + float(part.replace(",", "."))
+    return days * 86400 + sec
+
+
+def snapshot_tree(c, ts):
+    """Arbre complet des process. Le CPU vient du temps CPU consommé depuis l'échantillon précédent."""
+    exe = {}
+    for line in sh(["ps", "-Axo", "pid=,comm="]).splitlines():
+        p = line.strip().split(None, 1)
+        if len(p) == 2 and p[0].isdigit():
+            exe[int(p[0])] = p[1]
+    threads = {}
+    for line in sh(["ps", "-AM"]).splitlines()[1:]:  # une ligne par thread ; USER vide sur les lignes suivantes
+        tok = line.split()
+        if not tok:
+            continue
+        pid = tok[0] if line[:1].isspace() else (tok[1] if len(tok) > 1 else "")
+        if pid.isdigit():
+            threads[int(pid)] = threads.get(int(pid), 0) + 1
+    procs = {}
+    for line in sh(["ps", "-Axww", "-o", "pid=,ppid=,user=,pcpu=,rss=,time=,state=,lstart=,args="]).splitlines():
+        p = line.split(None, 12)
+        if len(p) < 12 or not p[0].isdigit():
+            continue
+        try:
+            pid, ppid = int(p[0]), int(p[1])
+            start = int(time.mktime(time.strptime(" ".join(p[7:12]), "%a %b %d %H:%M:%S %Y")))
+            procs[pid] = {"pid": pid, "ppid": ppid, "user": p[2], "pcpu": float(p[3].replace(",", ".")),
+                          "rss": int(p[4]) * 1024, "cputime": cpu_seconds(p[5]), "state": p[6][:1],
+                          "start": start, "args": (p[12] if len(p) > 12 else "")[:600]}
+        except (ValueError, IndexError):
+            continue
+    for pr in procs.values():
+        pr["pkey"] = f"{pr['pid']}:{pr['start']}"
+    last = {k: (cpu, t) for k, cpu, t in c.execute("SELECT pkey, cputime, ts FROM cpu_last")}
+    prev_ts = max((t for _, t in last.values()), default=None)
+    for pr in procs.values():
+        if pr["pkey"] in last:
+            cpu0, t0 = last[pr["pkey"]]
+            pr["cpu"] = max(0.0, (pr["cputime"] - cpu0) / max(1, ts - t0) * 100)
+        elif prev_ts and pr["start"] >= prev_ts:  # né depuis le dernier échantillon
+            pr["cpu"] = pr["cputime"] / max(1, ts - pr["start"]) * 100
+        else:
+            pr["cpu"] = pr["pcpu"]
+    keep = set()
+    for pid, pr in procs.items():
+        if pr["cpu"] >= TREE_MIN_CPU or pr["pcpu"] >= 1 or pr["rss"] >= TREE_MIN_RSS:
+            while pid in procs and pid not in keep:  # le process et toute sa chaîne de parents
+                keep.add(pid)
+                pid = procs[pid]["ppid"]
+    rows_info, rows_samp = [], []
+    for pid in keep:
+        pr = procs[pid]
+        parent = procs.get(pr["ppid"])
+        args = pr["args"] or exe.get(pid, "")
+        rows_info.append((pr["pkey"], pid, parent["pkey"] if parent else None, pr["ppid"], pr["user"], pr["start"],
+                          exe.get(pid, args.split(" ")[0]), args, proc_label(args or exe.get(pid, "?")), ts, ts))
+        rows_samp.append((ts, pr["pkey"], round(pr["cpu"], 2), pr["pcpu"], pr["rss"], threads.get(pid, 0), pr["state"]))
+    c.executemany("""INSERT INTO pinfo VALUES(?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(pkey) DO UPDATE SET
+                     ppkey=excluded.ppkey, ppid=excluded.ppid, last=excluded.last""", rows_info)
+    c.executemany("INSERT INTO psamp VALUES(?,?,?,?,?,?,?)", rows_samp)
+    c.execute("DELETE FROM cpu_last")
+    c.executemany("INSERT INTO cpu_last VALUES(?,?,?)", [(pr["pkey"], pr["cputime"], ts) for pr in procs.values()])
+    c.execute("INSERT OR REPLACE INTO sysextra VALUES(?,?,?)", (ts, len(procs), sum(threads.values())))
+    cutoff = ts - TREE_RETENTION_DAYS * 86400
+    c.execute("DELETE FROM psamp WHERE ts < ?", (cutoff,))
+    c.execute("DELETE FROM pinfo WHERE last < ?", (cutoff,))
+    c.execute("DELETE FROM sysextra WHERE ts < ?", (cutoff,))
+
+
+def power_sample():
+    """Batterie (ioreg, sans sudo) + températures / ventilateurs / puissance (macmon, si installé)."""
+    r = {}
+    bat = sh(["ioreg", "-rn", "AppleSmartBattery"], timeout=10)
+    def iv(key):
+        m = re.search(r'"%s" = (-?\d+)' % key, bat)
+        if not m:
+            return None
+        v = int(m.group(1))
+        return v - (1 << 64) if v >= 1 << 63 else v  # courant négatif affiché en non signé
+    def yes(key):
+        m = re.search(r'"%s" = (Yes|No)' % key, bat)
+        return None if not m else int(m.group(1) == "Yes")
+    if bat:
+        volt, amp = iv("Voltage"), iv("Amperage")
+        raw_max, design = iv("AppleRawMaxCapacity"), iv("DesignCapacity")
+        t = iv("Temperature")
+        m = re.search(r'"AdapterDetails" = \{[^}]*"Watts"=(\d+)', bat)
+        r.update(bat_pct=iv("CurrentCapacity"), charging=yes("IsCharging"), plugged=yes("ExternalConnected"),
+                 bat_temp=t / 100 if t is not None else None, bat_volt=volt / 1000 if volt else None,
+                 bat_amp=amp / 1000 if amp is not None else None,
+                 bat_w=round(volt * amp / 1e6, 2) if volt and amp is not None else None,
+                 cycles=iv("CycleCount"), raw_max=raw_max, design=design,
+                 health=round(raw_max / design * 100, 1) if raw_max and design else None,
+                 adapter_w=int(m.group(1)) if m and yes("ExternalConnected") else None)
+    macmon = shutil.which("macmon") or next((x for x in ("/opt/homebrew/bin/macmon", "/usr/local/bin/macmon") if os.path.exists(x)), None)
+    if macmon:
+        line = sh([macmon, "pipe", "-s", "1", "-i", "500"], timeout=15).strip().splitlines()
+        try:
+            d = json.loads(line[0]) if line else {}
+        except ValueError:
+            d = {}
+        temp = d.get("temp") or {}
+        fans = d.get("fans") or []
+        r.update(cpu_temp=temp.get("cpu_temp_avg"), gpu_temp=temp.get("gpu_temp_avg"),
+                 fan_rpm=max((f.get("rpm", 0) for f in fans), default=None),
+                 fan_max=max((f.get("max_rpm", 0) for f in fans), default=None),
+                 sys_w=d.get("sys_power"), cpu_w=d.get("cpu_power"), gpu_w=d.get("gpu_power"))
+    return r
+
+
+POWER_COLS = ["bat_pct", "charging", "plugged", "bat_temp", "bat_volt", "bat_amp", "bat_w", "cycles", "health",
+              "raw_max", "design", "adapter_w", "cpu_temp", "gpu_temp", "fan_rpm", "fan_max", "sys_w", "cpu_w", "gpu_w"]
+
+
+def collect():
+    ts = int(time.time())
+    load1, load5, load15 = os.getloadavg()
+    cpu_user = cpu_sys = None
+    for line in sh(["top", "-l", "2", "-n", "0", "-s", "1"]).splitlines():
+        m = re.search(r"CPU usage: ([\d.]+)% user, ([\d.]+)% sys", line)
+        if m:
+            cpu_user, cpu_sys = float(m.group(1)), float(m.group(2))  # garde le 2e échantillon
+    ncpu = os.cpu_count() or 1
+    mem_total = int(sh(["sysctl", "-n", "hw.memsize"]).strip() or 0)
+    vm = sh(["vm_stat"])
+    page = int((re.search(r"page size of (\d+)", vm) or [0, 16384])[1])
+    def pages(label):
+        m = re.search(re.escape(label) + r":\s+(\d+)", vm)
+        return int(m.group(1)) * page if m else 0
+    wired = pages("Pages wired down")
+    compressed = pages("Pages occupied by compressor")
+    used = pages("Anonymous pages") - pages("Pages purgeable") + wired + compressed
+    free_pct = int(sh(["sysctl", "-n", "kern.memorystatus_level"]).strip() or 0)
+    sw = sh(["sysctl", "-n", "vm.swapusage"])
+    def mb(k):
+        m = re.search(k + r" = ([\d.]+)M", sw)
+        return int(float(m.group(1)) * 1048576) if m else 0
+    data_vol = "/System/Volumes/Data" if os.path.exists("/System/Volumes/Data") else "/"
+    du = shutil.disk_usage(data_vol)
+
+    agg = {}
+    for line in sh(["ps", "-Axo", "pcpu=,rss=,command="]).splitlines():
+        p = line.strip().split(None, 2)
+        if len(p) < 3:
+            continue
+        try:
+            cpu, rss = float(p[0].replace(",", ".")), int(p[1]) * 1024
+        except ValueError:
+            continue
+        name = proc_label(p[2])
+        a = agg.setdefault(name, [0.0, 0, 0])
+        a[0] += cpu; a[1] += rss; a[2] += 1
+    by_cpu = sorted(agg.items(), key=lambda kv: -kv[1][0])[:TOP_N]
+    by_mem = sorted(agg.items(), key=lambda kv: -kv[1][1])[:TOP_N]
+    keep = dict(by_cpu + by_mem)
+
+    c = db()
+    with c:
+        c.execute("INSERT OR REPLACE INTO samples VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                  (ts, load1, load5, load15, cpu_user, cpu_sys, ncpu, mem_total, used, compressed, wired,
+                   free_pct, mb("used"), mb("total"), du.total, du.used))
+        c.executemany("INSERT INTO procs VALUES(?,?,?,?,?)",
+                      [(ts, k, round(v[0], 1), v[1], v[2]) for k, v in keep.items()])
+        snapshot_tree(c, ts)
+        pw = power_sample()
+        if pw:
+            c.execute("INSERT OR REPLACE INTO power VALUES(?%s)" % (",?" * len(POWER_COLS)),
+                      [ts] + [pw.get(k) for k in POWER_COLS])
+        cutoff = ts - RETENTION_DAYS * 86400
+        c.execute("DELETE FROM samples WHERE ts < ?", (cutoff,))
+        c.execute("DELETE FROM procs WHERE ts < ?", (cutoff,))
+        c.execute("DELETE FROM dirs WHERE day < ?", (dt.date.fromtimestamp(cutoff).isoformat(),))
+    c.close()
+
+
+def du_scan():
+    day = dt.date.today().isoformat()
+    rows = {}
+    for target, depth in DU_TARGETS:
+        if not os.path.isdir(target):
+            continue
+        out = sh(["nice", "-n", "19", "du", "-xk", "-d", str(depth), target], timeout=1800)
+        for line in out.splitlines():
+            p = line.split("\t", 1)
+            if len(p) == 2 and p[0].isdigit() and int(p[0]) >= DU_MIN_KB:
+                rows[p[1]] = int(p[0])
+    if rows:
+        c = db()
+        with c:
+            c.execute("DELETE FROM dirs WHERE day=?", (day,))
+            c.executemany("INSERT INTO dirs VALUES(?,?,?)", [(day, k, v) for k, v in rows.items()])
+        c.close()
+
+
+# ---------------------------------------------------------------- rapport
+
+def gb(b):
+    return b / 1073741824
+
+
+def fmt_size(kb):
+    b = kb * 1024
+    for unit, f in (("To", 1 << 40), ("Go", 1 << 30), ("Mo", 1 << 20)):
+        if b >= f:
+            return f"{b / f:.1f} {unit}".replace(".", ",")
+    return f"{kb} Ko"
+
+
+def short_path(p):
+    return "~" + p[len(HOME):] if p.startswith(HOME) else p
+
+
+def build_report(start, end, title, out_path):
+    c = db()
+    S = c.execute("SELECT ts,load1,cpu_user,cpu_sys,ncpu,mem_total,mem_used,swap_used,disk_total,disk_used,mem_free_pct "
+                  "FROM samples WHERE ts>=? AND ts<? ORDER BY ts", (start, end)).fetchall()
+    if not S:
+        c.close()
+        return None
+    n = len(S)
+    ncpu = S[-1][4] or 1
+    # séries (sous-échantillonnées à ~600 points)
+    step = max(1, n // 600)
+    def bucket(i):
+        chunk = S[i:i + step]
+        return chunk
+    pts = []
+    for i in range(0, n, step):
+        ch = S[i:i + step]
+        cpu = [(r[2] or 0) + (r[3] or 0) for r in ch]
+        pts.append({"t": ch[0][0], "cpu": round(sum(cpu) / len(ch), 1), "load": round(max(r[1] for r in ch), 2),
+                    "mem": round(gb(sum(r[6] for r in ch) / len(ch)), 2), "swap": round(gb(max(r[7] for r in ch)), 2)})
+    # énergie et températures, alignées sur les mêmes points
+    PW = {r[0]: dict(zip(POWER_COLS, r[1:])) for r in c.execute(
+        "SELECT ts,%s FROM power WHERE ts>=? AND ts<?" % ",".join(POWER_COLS), (start, end))}
+    def pmean(chunk, k, agg="avg", nd=1):
+        v = [PW[r[0]][k] for r in chunk if r[0] in PW and PW[r[0]][k] is not None]
+        if not v:
+            return None
+        return round(max(v) if agg == "max" else sum(v) / len(v), nd)
+    for i, pt in enumerate(pts):
+        ch = S[i * step:i * step + step]
+        pt.update(bat=pmean(ch, "bat_pct", nd=0), plug=pmean(ch, "plugged", "max", 0),
+                  ctemp=pmean(ch, "cpu_temp"), gtemp=pmean(ch, "gpu_temp"), btemp=pmean(ch, "bat_temp"),
+                  fan=pmean(ch, "fan_rpm", "max", 0), sysw=pmean(ch, "sys_w"), cpuw=pmean(ch, "cpu_w"),
+                  gpuw=pmean(ch, "gpu_w"), batw=pmean(ch, "bat_w"))
+    power = None
+    if PW:
+        rows = [PW[k] for k in sorted(PW)]
+        def col(k):
+            return [r[k] for r in rows if r[k] is not None]
+        def avg(v):
+            return sum(v) / len(v) if v else None
+        last = rows[-1]
+        power = {"bat_last": last["bat_pct"], "bat_min": min(col("bat_pct"), default=None), "bat_max": max(col("bat_pct"), default=None),
+                 "plugged_pct": avg([r["plugged"] for r in rows if r["plugged"] is not None]),
+                 "health": last["health"], "cycles": last["cycles"], "raw_max": last["raw_max"], "design": last["design"],
+                 "bat_temp_max": max(col("bat_temp"), default=None),
+                 "cpu_temp_avg": avg(col("cpu_temp")), "cpu_temp_max": max(col("cpu_temp"), default=None),
+                 "gpu_temp_max": max(col("gpu_temp"), default=None),
+                 "fan_max": max(col("fan_rpm"), default=None), "fan_limit": max(col("fan_max"), default=None),
+                 "sys_w_avg": avg(col("sys_w")), "sys_w_max": max(col("sys_w"), default=None),
+                 "cpu_w_avg": avg(col("cpu_w")), "gpu_w_avg": avg(col("gpu_w")),
+                 "has_bat": bool(col("bat_pct")), "has_temp": bool(col("cpu_temp")), "has_fan": bool(col("fan_rpm"))}
+    cpu_all = [(r[2] or 0) + (r[3] or 0) for r in S]
+    mem_total = S[-1][5]
+    tiles = {
+        "cpu_avg": sum(cpu_all) / n, "cpu_max": max(cpu_all),
+        "load_avg": sum(r[1] for r in S) / n, "load_max": max(r[1] for r in S), "ncpu": ncpu,
+        "mem_avg": gb(sum(r[6] for r in S) / n), "mem_max": gb(max(r[6] for r in S)), "mem_total": gb(mem_total),
+        "swap_max": gb(max(r[7] for r in S)), "pressure_min": min(r[10] for r in S),
+        "disk_used": gb(S[-1][9]), "disk_total": gb(S[-1][8]), "disk_delta": gb(S[-1][9] - S[0][9]),
+        "samples": n,
+    }
+    # process
+    P = c.execute("SELECT name, SUM(cpu), MAX(cpu), SUM(rss), MAX(rss), COUNT(*) FROM procs WHERE ts>=? AND ts<? GROUP BY name",
+                  (start, end)).fetchall()
+    top_cpu = sorted(P, key=lambda r: -r[1])[:15]
+    top_mem = sorted(P, key=lambda r: -r[3])[:15]
+    # moments les plus chargés
+    peaks = sorted(S, key=lambda r: -r[1])
+    chosen = []
+    for r in peaks:
+        if all(abs(r[0] - x[0]) > 1800 for x in chosen):
+            chosen.append(r)
+        if len(chosen) == 8:
+            break
+    peak_rows = []
+    for r in sorted(chosen, key=lambda r: r[0]):
+        procs = c.execute("SELECT name, cpu FROM procs WHERE ts=? ORDER BY cpu DESC LIMIT 4", (r[0],)).fetchall()
+        peak_rows.append((r[0], r[1], (r[2] or 0) + (r[3] or 0), procs))
+    # dossiers
+    day = c.execute("SELECT MAX(day) FROM dirs WHERE day<=?", (dt.date.fromtimestamp(end - 1).isoformat(),)).fetchone()[0]
+    dirs, prev_day = [], None
+    if day:
+        prev_day = c.execute("SELECT MAX(day) FROM dirs WHERE day<?", (day,)).fetchone()[0]
+        cur = dict(c.execute("SELECT path, kb FROM dirs WHERE day=?", (day,)).fetchall())
+        prev = dict(c.execute("SELECT path, kb FROM dirs WHERE day=?", (prev_day,)).fetchall()) if prev_day else {}
+        roots = {t for t, _ in DU_TARGETS}
+        # retire un parent quand un enfant en représente >= 80 %
+        def redundant(p, kb):
+            pre = p.rstrip("/") + "/"
+            return any(q.startswith(pre) and k >= 0.8 * kb for q, k in cur.items())
+        cand = [(p, kb) for p, kb in cur.items() if p not in roots and not redundant(p, kb)]
+        for p, kb in sorted(cand, key=lambda x: -x[1])[:30]:
+            dirs.append((p, kb, (kb - prev[p]) if p in prev else None))
+    c.close()
+
+    data = {"points": pts, "range_days": (end - start) / 86400}
+    explorer = explorer_data(start, end, S, ncpu, mem_total)
+    html_text = render_html(title, start, end, tiles, top_cpu, top_mem, peak_rows, dirs, day, prev_day, data, explorer, power)
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    with open(out_path, "w") as f:
+        f.write(html_text)
+    # nettoyage des vieux rapports
+    cutoff = time.time() - RETENTION_DAYS * 86400
+    for fn in os.listdir(REPORTS):
+        fp = os.path.join(REPORTS, fn)
+        if os.path.isfile(fp) and os.path.getmtime(fp) < cutoff:
+            os.remove(fp)
+    return out_path
+
+
+def explorer_data(start, end, S, ncpu, mem_total):
+    """Arbre des process pour l'explorateur : agrégats sur la période + instantanés."""
+    c = db()
+    ts_list = [r[0] for r in S]
+    dts, prev = {}, None
+    for t in ts_list:
+        dts[t] = min(900, t - prev) if prev else 300
+        prev = t
+    agg, by_ts = {}, {}
+    for t, k, cpu, rss, th, st in c.execute(
+            "SELECT ts, pkey, cpu, rss, th, state FROM psamp WHERE ts>=? AND ts<?", (start, end)):
+        a = agg.get(k)
+        if a is None:
+            a = agg[k] = [0.0, 0.0, 0, 0, 0, t, t, 0]
+        a[0] += cpu / 100 * dts.get(t, 300)
+        a[1] = max(a[1], cpu); a[2] += rss; a[3] = max(a[3], rss); a[4] = max(a[4], th)
+        a[5] = min(a[5], t); a[6] = max(a[6], t); a[7] += 1
+        by_ts.setdefault(t, []).append((k, cpu, rss, th, st))
+    if not agg:
+        c.close()
+        return None
+    info = {}
+    todo = set(agg)
+    while todo:  # pinfo des process + parents manquants
+        ks = list(todo)
+        todo = set()
+        for i in range(0, len(ks), 500):
+            chunk = ks[i:i + 500]
+            q = "SELECT pkey,pid,ppkey,user,start,exe,args,label FROM pinfo WHERE pkey IN (%s)" % ",".join("?" * len(chunk))
+            for r in c.execute(q, chunk):
+                info[r[0]] = r
+                if r[2] and r[2] not in info and r[2] not in agg:
+                    todo.add(r[2])
+        todo -= set(info)
+    extra = dict((t, (n, th)) for t, n, th in c.execute("SELECT ts, nprocs, nthreads FROM sysextra WHERE ts>=? AND ts<?", (start, end)))
+    c.close()
+    keys = list(info)
+    idx = {k: i for i, k in enumerate(keys)}
+    procs = []
+    for k in keys:
+        _, pid, ppkey, user, st, exe, args, label = info[k]
+        procs.append([pid, idx.get(ppkey, -1), user, st, os.path.basename(exe or "")[:80], args or "", label])
+    aggs = []
+    for k in keys:
+        a = agg.get(k)
+        aggs.append([round(a[0], 1), round(a[1], 1), round(a[2] / a[7] / 1048576), round(a[3] / 1048576), a[4], a[5], a[6], a[7]]
+                    if a else None)
+    # instantanés : tous si raisonnable, sinon un échantillonnage régulier + les pics de charge
+    snap_ts = [t for t in ts_list if t in by_ts]
+    if len(snap_ts) > 600:
+        stride = len(snap_ts) / 480
+        chosen = {snap_ts[int(i * stride)] for i in range(480)}
+        load = {r[0]: r[1] for r in S}
+        chosen |= set(sorted(snap_ts, key=lambda t: -load[t])[:120])
+        snap_ts = sorted(chosen)
+    srow = {r[0]: r for r in S}
+    snaps = []
+    for t in snap_ts:
+        r = srow[t]
+        n, th = extra.get(t, (0, 0))
+        snaps.append({"t": t, "cpu": round((r[2] or 0) + (r[3] or 0), 1), "load": round(r[1], 2),
+                      "mem": round(r[6] / 1048576), "swap": round(r[7] / 1048576), "np": n, "nt": th,
+                      "rows": [[idx[k], round(cpu, 1), round(rss / 1048576), thr, st] for k, cpu, rss, thr, st in by_ts[t] if k in idx]})
+    peak = max(range(len(snaps)), key=lambda i: snaps[i]["load"]) if snaps else 0
+    return {"procs": procs, "agg": aggs, "snaps": snaps, "peak": peak, "ncpu": ncpu,
+            "memTotal": round(mem_total / 1048576), "period": end - start}
+
+
+def nf(x, d=1):
+    return f"{x:.{d}f}".replace(".", ",")
+
+
+
+# ---------------------------------------------------------------- explorateur de process (style htop/btop)
+
+EXPLORER_HTML = r'''<div class="card" id="px-card" style="margin-bottom:16px"><h2>Explorateur de process</h2>
+<p class="sub" style="margin:-6px 0 10px">Arbre père → fils. <b>Période</b> : ce que chaque process a consommé sur toute la période (temps CPU réel, mesuré entre deux échantillons). <b>Instantané</b> : l'arbre à un moment donné, comme htop. Clique sur une courbe CPU ou load pour y aller. Σ = total du process et de ses descendants.</p>
+<div id="px"></div></div>'''
+
+EXPLORER_CSS = r'''
+.px-bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
+.seg{display:inline-flex;border:1px solid var(--axis);border-radius:7px;overflow:hidden}
+.seg button{border:0;background:transparent;color:var(--ink2);padding:5px 11px;font:inherit;font-size:13px;cursor:pointer}
+.seg button.on{background:var(--s1);color:var(--on-s1)}
+.px-bar input[type=search]{flex:1;min-width:160px;padding:6px 9px;border:1px solid var(--axis);border-radius:7px;background:var(--page);color:var(--ink);font:inherit;font-size:13px}
+.px-bar label{font-size:13px;color:var(--ink2);display:flex;gap:5px;align-items:center}
+.px-count{font-size:12px;color:var(--muted);margin-left:auto}
+.px-snap{display:grid;grid-template-columns:auto 1fr auto;gap:8px 12px;align-items:center;margin-bottom:10px}
+.px-snap button{border:1px solid var(--axis);background:var(--page);color:var(--ink);border-radius:6px;padding:3px 9px;cursor:pointer;font:inherit}
+.px-snap input[type=range]{width:100%}
+.px-when{font-weight:600;white-space:nowrap}
+.px-meters{grid-column:1/-1;display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:6px 16px;font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace}
+.px-meters .mm{display:flex;align-items:center;gap:6px}.px-meters .mm b{width:44px;color:var(--ink2);font-weight:500}
+.px-meters .mm .track{flex:1;height:8px;background:var(--grid);border-radius:2px;overflow:hidden}.px-meters .mm .track i{display:block;height:100%;background:var(--s1)}
+.px-wrap{max-height:72vh;overflow:auto;border:1px solid var(--grid);border-radius:8px}
+table.pt{font:12.5px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace;border-collapse:separate;border-spacing:0;width:100%}
+table.pt th{position:sticky;top:0;background:var(--surface);z-index:1;cursor:pointer;user-select:none;white-space:nowrap;border-bottom:1px solid var(--axis);font-family:inherit}
+table.pt th.on{color:var(--ink)}table.pt th.on::after{content:" ▾"}table.pt th.on.asc::after{content:" ▴"}
+table.pt td{padding:3px 8px;border-bottom:1px solid var(--grid);white-space:nowrap}
+table.pt tr.r{cursor:pointer}table.pt tr.r:hover td{background:color-mix(in srgb,var(--s1) 8%,transparent)}
+table.pt tr.sel td{background:color-mix(in srgb,var(--s1) 16%,transparent)}
+table.pt td.nm{max-width:340px;overflow:hidden;text-overflow:ellipsis}
+table.pt td.cmd{color:var(--muted);max-width:420px;overflow:hidden;text-overflow:ellipsis}
+.cr{display:inline-block;width:14px;color:var(--muted)}.guide{color:var(--axis)}
+.sum{color:var(--muted);font-size:11px;margin-left:4px}
+.mt{display:inline-block;width:42px;height:8px;background:var(--grid);border-radius:2px;vertical-align:middle;margin-right:6px;overflow:hidden}
+.mt i{display:block;height:100%;background:var(--s1)}.mt i.hot{background:var(--s2)}
+.st-R{color:var(--down);font-weight:600}.st-Z,.st-U{color:var(--up);font-weight:600}
+tr.det td{white-space:normal;background:var(--page);padding:10px 12px 14px;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px}
+tr.det td>.det{position:sticky;left:12px;width:min(1100px,calc(100vw - 150px))}
+.det-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px 24px}
+.det code{display:block;white-space:pre-wrap;word-break:break-all;background:var(--surface);border:1px solid var(--grid);border-radius:6px;padding:8px;margin:4px 0 8px;font-size:12px}
+.det a{color:var(--s1);cursor:pointer;text-decoration:none}.det a:hover{text-decoration:underline}
+.det .k{color:var(--ink2);font-size:12px}.spark{width:100%;height:46px;display:block}
+'''
+
+EXPLORER_JS = r'''
+(()=>{
+if(typeof EX==='undefined'||!EX)return;
+const P=EX.procs,A=EX.agg,S=EX.snaps,NC=EX.ncpu,MT=EX.memTotal;
+const root=document.getElementById('px');
+const st={mode:'period',view:'tree',sort:{period:'cpusec',snap:'cpu'},asc:false,q:'',all:false,snap:EX.peak,sel:-1,col:new Set(),exp:new Set()};
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fr=(v,d=1)=>(+v).toLocaleString('fr-FR',{minimumFractionDigits:d,maximumFractionDigits:d});
+const mb=v=>v>=1024?fr(v/1024,1)+' Go':Math.round(v)+' Mo';
+const secs=s=>s>=3600?Math.floor(s/3600)+' h '+String(Math.floor(s%3600/60)).padStart(2,'0'):s>=60?Math.floor(s/60)+' min '+String(Math.floor(s%60)).padStart(2,'0'):fr(s,s<10?1:0)+' s';
+const hm=t=>new Date(t*1000).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+const day=t=>new Date(t*1000).toLocaleString('fr-FR',{weekday:'short',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+const meter=v=>`<span class="mt"><i class="${v>100?'hot':''}" style="width:${Math.min(100,v)}%"></i></span>`;
+
+const COLS={
+ period:[
+  {k:'name',h:'Process'},{k:'pid',h:'PID',n:1},{k:'user',h:'Util.'},
+  {k:'cpusec',h:'Temps CPU',n:1,sub:1},{k:'cpu',h:'CPU moy.',n:1},{k:'peak',h:'CPU pic',n:1},
+  {k:'rss',h:'RAM moy.',n:1,sub:1},{k:'rsspeak',h:'RAM pic',n:1},{k:'th',h:'Thr.',n:1},{k:'life',h:'Vu'},{k:'cmd',h:'Commande'}],
+ snap:[
+  {k:'name',h:'Process'},{k:'pid',h:'PID',n:1},{k:'user',h:'Util.'},{k:'state',h:'S'},
+  {k:'cpu',h:'CPU %',n:1,sub:1},{k:'mem',h:'MEM %',n:1},{k:'rss',h:'RSS',n:1,sub:1},{k:'th',h:'Thr.',n:1},
+  {k:'start',h:'Démarré',n:1},{k:'cmd',h:'Commande'}]};
+
+function metrics(){
+  const m=new Map();
+  if(st.mode==='period'){
+    A.forEach((a,i)=>{if(!a)return;const alive=Math.max(300,a[6]-a[5]+300);
+      m.set(i,{cpusec:a[0],cpu:a[0]/alive*100,peak:a[1],rss:a[2],rsspeak:a[3],th:a[4],first:a[5],last:a[6]})});
+  }else{
+    const s=S[st.snap];if(s)for(const r of s.rows)m.set(r[0],{cpu:r[1],rss:r[2],th:r[3],state:r[4],mem:r[2]/MT*100});
+  }
+  // les parents absents de la période restent comme nœuds de structure
+  for(const i of [...m.keys()]){let p=P[i][1];while(p>=0&&!m.has(p)){m.set(p,{cpusec:0,cpu:0,peak:0,rss:0,rsspeak:0,th:0,mem:0,state:'',ghost:1});p=P[p][1]}}
+  return m;
+}
+function tree(m){
+  const kids=new Map(),roots=[];
+  for(const i of m.keys()){
+    let p=P[i][1];
+    if(p<0||P[i][0]<=1||P[p][0]===0){roots.push(i);continue}
+    if(P[p][0]===1&&P[i][0]!==1){roots.push(i);continue}// enfants de launchd au premier niveau
+    (kids.get(p)||kids.set(p,[]).get(p)).push(i);
+  }
+  const sub=new Map();
+  const walk=i=>{const o=m.get(i);const s={cpusec:o.cpusec||0,cpu:o.cpu||0,rss:o.rss||0,n:1};
+    for(const c of kids.get(i)||[]){const t=walk(c);s.cpusec+=t.cpusec;s.cpu+=t.cpu;s.rss+=t.rss;s.n+=t.n}
+    sub.set(i,s);return s};
+  roots.forEach(walk);
+  return {kids,roots,sub};
+}
+function val(i,k,m,sub,useSub){
+  const o=m.get(i),p=P[i];
+  switch(k){
+    case 'name':return p[6].toLowerCase();case 'pid':return p[0];case 'user':return p[2];case 'cmd':return p[5];
+    case 'start':return p[3];case 'life':return o.first||0;case 'state':return o.state||'';
+    default:return useSub&&sub&&sub.has(i)&&(k in sub.get(i))?sub.get(i)[k]:(o[k]||0);
+  }
+}
+function render(){
+  const m=metrics(),T=tree(m),cols=COLS[st.mode],sk=st.sort[st.mode],q=st.q.trim().toLowerCase();
+  const isTree=st.view==='tree';
+  const cmp=(a,b)=>{const x=val(a,sk,m,T.sub,isTree),y=val(b,sk,m,T.sub,isTree);const r=x<y?-1:x>y?1:0;return st.asc?r:-r};
+  const match=i=>{const p=P[i];return p[6].toLowerCase().includes(q)||p[5].toLowerCase().includes(q)||String(p[0])===q||p[2].toLowerCase()===q};
+  let visible;
+  const totalSec=[...m.values()].reduce((s,o)=>s+(o.cpusec||0),0);
+  const significant=i=>{const s=T.sub.get(i);if(!s)return false;
+    return st.mode==='period'?(s.cpusec>=Math.max(2,totalSec*0.001)||s.rss>=150):(s.cpu>=0.5||s.rss>=100)};
+  if(q){visible=new Set();for(const i of m.keys())if(match(i)){let j=i;while(j>=0&&!visible.has(j)){visible.add(j);j=P[j][1]}}}
+  else if(!st.all){visible=new Set([...m.keys()].filter(significant))}
+  else visible=new Set(m.keys());
+  const rows=[];
+  if(isTree){
+    const vk=i=>(T.kids.get(i)||[]).filter(c=>visible.has(c));
+    const collapsed=(i,n)=>!q&&(st.col.has(i)||(n>12&&!st.exp.has(i)));
+    const emit=(i,d,guide)=>{const ks=vk(i).sort(cmp);rows.push([i,d,ks.length,collapsed(i,ks.length),guide]);
+      if(!collapsed(i,ks.length))ks.forEach((c,j)=>emit(c,d+1,guide+(j===ks.length-1?'└ ':'├ ')));};
+    T.roots.filter(i=>visible.has(i)).sort(cmp).forEach(i=>emit(i,0,''));
+  }else{
+    [...visible].filter(i=>!m.get(i).ghost&&(q?match(i):true)).sort(cmp).forEach(i=>rows.push([i,0,0,false,'']));
+  }
+  const LIMIT=1500,shown=rows.slice(0,LIMIT);
+  let h='<table class="pt"><thead><tr>'+cols.map(c=>`<th data-sort="${c.k}" class="${c.n?'num ':''}${c.k===sk?'on'+(st.asc?' asc':''):''}">${c.h}</th>`).join('')+'</tr></thead><tbody>';
+  for(const [i,d,nk,col,guide] of shown){
+    const o=m.get(i),p=P[i],s=T.sub.get(i);
+    const caret=isTree&&nk?`<span class="cr" data-tog="${i}">${col?'▸':'▾'}</span>`:'<span class="cr"></span>';
+    const g=isTree?`<span class="guide">${guide.slice(0,-2).replace(/├ /g,'│ ').replace(/└ /g,'  ')}${guide.slice(-2)}</span>`:'';
+    const kidsNote=isTree&&nk&&col?`<span class="sum">+${s.n-1}</span>`:'';
+    const cells=cols.map(c=>{
+      const showSum=isTree&&c.sub&&nk&&s;
+      switch(c.k){
+        case 'name':return `<td class="nm" title="${esc(p[5])}">${g}${caret}<b>${esc(p[6])}</b>${kidsNote}</td>`;
+        case 'pid':return `<td class="num">${p[0]}</td>`;
+        case 'user':return `<td>${esc(p[2].slice(0,10))}</td>`;
+        case 'cmd':return `<td class="cmd" title="${esc(p[5])}">${esc(p[5].slice(0,160))}</td>`;
+        case 'cpusec':return `<td class="num">${o.ghost?'':secs(o.cpusec)}${showSum&&s.cpusec>o.cpusec+0.5?`<span class="sum">Σ ${secs(s.cpusec)}</span>`:''}</td>`;
+        case 'cpu':return `<td class="num">${o.ghost?'':meter(o.cpu)+fr(o.cpu)}${st.mode==='snap'&&showSum&&s.cpu>o.cpu+0.5?`<span class="sum">Σ ${fr(s.cpu)}</span>`:''}</td>`;
+        case 'peak':return `<td class="num">${o.ghost?'':fr(o.peak,0)+' %'}</td>`;
+        case 'rss':return `<td class="num">${o.ghost?'':mb(o.rss)}${showSum&&s.rss>o.rss+1?`<span class="sum">Σ ${mb(s.rss)}</span>`:''}</td>`;
+        case 'rsspeak':return `<td class="num">${o.ghost?'':mb(o.rsspeak)}</td>`;
+        case 'mem':return `<td class="num">${o.ghost?'':fr(o.mem)}</td>`;
+        case 'th':return `<td class="num">${o.th||''}</td>`;
+        case 'state':return `<td class="st-${o.state}">${o.state||''}</td>`;
+        case 'start':return `<td class="num">${day(p[3])}</td>`;
+        case 'life':return `<td>${o.first?hm(o.first)+' → '+hm(o.last):''}</td>`;
+      }}).join('');
+    h+=`<tr class="r${st.sel===i?' sel':''}" data-row="${i}">${cells}</tr>`;
+    if(st.sel===i)h+=`<tr class="det"><td colspan="${cols.length}">${detail(i,m,T)}</td></tr>`;
+  }
+  h+='</tbody></table>';
+  if(rows.length>LIMIT)h+=`<p class="sub">… ${rows.length-LIMIT} lignes de plus : affine la recherche.</p>`;
+  root.querySelector('.px-wrap').innerHTML=h;const wrap=root.querySelector('.px-wrap');wrap.querySelectorAll('tr.det td>.det').forEach(d=>d.style.width=(wrap.clientWidth-28)+'px');
+  root.querySelector('.px-count').textContent=`${rows.length} process affichés sur ${m.size}`+(st.all||q?'':' (les plus significatifs)');
+  renderSnapHeader();
+}
+function spark(vals,fmt){
+  if(!vals.some(v=>v>0))return '<span class="dim">—</span>';
+  const W=300,H=46,mx=Math.max(...vals)||1,n=vals.length;
+  const pts=vals.map((v,j)=>`${(j/(Math.max(1,n-1))*W).toFixed(1)},${(H-3-(v/mx)*(H-6)).toFixed(1)}`).join(' ');
+  return `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><polygon points="0,${H} ${pts} ${W},${H}" fill="var(--s1)" opacity=".15"/><polyline points="${pts}" fill="none" stroke="var(--s1)" stroke-width="1.6" vector-effect="non-scaling-stroke"/></svg><span class="dim" style="font-size:11px">max ${fmt(mx)}</span>`;
+}
+function detail(i,m,T){
+  const p=P[i],o=m.get(i),s=T.sub.get(i);
+  const chain=[];let j=p[1];while(j>=0&&chain.length<12){chain.unshift(j);j=P[j][1]}
+  const chainH=chain.map(k=>`<a data-sel="${k}">${esc(P[k][6])} <span class="dim">${P[k][0]}</span></a>`).join(' → ')+(chain.length?' → ':'')+`<b>${esc(p[6])}</b>`;
+  const kids=(T.kids.get(i)||[]);
+  const kidsH=kids.slice().sort((a,b)=>(T.sub.get(b).cpusec+T.sub.get(b).cpu)-(T.sub.get(a).cpusec+T.sub.get(a).cpu)).slice(0,12)
+    .map(k=>`<a data-sel="${k}">${esc(P[k][6])} <span class="dim">${P[k][0]}</span></a>`).join(', ')+(kids.length>12?` … +${kids.length-12}`:'');
+  const cpuS=[],rssS=[];
+  for(const sn of S){const r=sn.rows.find(r=>r[0]===i);cpuS.push(r?r[1]:0);rssS.push(r?r[2]:0)}
+  const a=A[i];
+  return `<div class="det"><div class="k">Commande complète</div><code>${esc(p[5]||p[4])}</code>
+  <div class="det-grid">
+   <div><div class="k">Chaîne des parents</div>${chainH}</div>
+   <div><div class="k">Enfants (${kids.length})</div>${kidsH||'<span class="dim">aucun</span>'}</div>
+   <div><div class="k">Identité</div>PID ${p[0]} · ${esc(p[2])} · exécutable <b>${esc(p[4])}</b><br>démarré ${day(p[3])}</div>
+   <div><div class="k">Sur la période</div>${a?`temps CPU ${secs(a[0])} (Σ sous-arbre ${secs(s&&st.mode==='period'?s.cpusec:a[0])}) · pic ${fr(a[1],0)} % · RAM moy. ${mb(a[2])}, pic ${mb(a[3])} · vu de ${hm(a[5])} à ${hm(a[6])}`:'<span class="dim">pas de mesure propre (process parent)</span>'}</div>
+   <div><div class="k">CPU (% d'un cœur) au fil des instantanés</div>${spark(cpuS,v=>fr(v,0)+' %')}</div>
+   <div><div class="k">RAM au fil des instantanés</div>${spark(rssS,mb)}</div>
+  </div></div>`;
+}
+function renderSnapHeader(){
+  const box=root.querySelector('.px-snap');
+  if(st.mode!=='snap'||!S.length){box.style.display='none';return}
+  box.style.display='grid';
+  const s=S[st.snap];
+  box.querySelector('.px-when').textContent=day(s.t);
+  box.querySelector('input').value=st.snap;
+  const bar=(label,v,max,txt)=>`<div class="mm"><b>${label}</b><span class="track"><i style="width:${Math.min(100,v/max*100)}%;${v>max?'background:var(--s2)':''}"></i></span><span>${txt}</span></div>`;
+  box.querySelector('.px-meters').innerHTML=
+    bar('CPU',s.cpu,100,fr(s.cpu,0)+' %')+bar('Load',s.load,NC,fr(s.load)+' / '+NC)+
+    bar('Mém',s.mem,MT,mb(s.mem)+' / '+mb(MT))+bar('Swap',s.swap,Math.max(s.swap,1024),mb(s.swap))+
+    `<div class="mm"><b>Tâches</b><span>${s.np||'?'} process, ${s.nt||'?'} threads</span></div>`;
+}
+root.innerHTML=`<div class="px-bar">
+ <span class="seg"><button data-mode="period">Période</button><button data-mode="snap">Instantané</button></span>
+ <span class="seg"><button data-view="tree">Arbre</button><button data-view="list">Liste</button></span>
+ <input type="search" placeholder="Filtrer : nom, commande, PID, utilisateur…">
+ <label><input type="checkbox" class="px-all"> tout afficher</label><span class="px-count"></span></div>
+ <div class="px-snap"><button data-step="-1">◀</button><input type="range" min="0" max="${Math.max(0,S.length-1)}"><button data-step="1">▶</button>
+ <span class="px-when"></span><span></span><button data-peak="1">Pic de charge</button><div class="px-meters"></div></div>
+ <div class="px-wrap"></div>`;
+const syncBtns=()=>{root.querySelectorAll('[data-mode]').forEach(b=>b.classList.toggle('on',b.dataset.mode===st.mode));
+  root.querySelectorAll('[data-view]').forEach(b=>b.classList.toggle('on',b.dataset.view===st.view))};
+root.addEventListener('click',e=>{
+  const t=e.target.closest('[data-mode],[data-view],[data-sort],[data-tog],[data-sel],[data-step],[data-peak],[data-row]');if(!t)return;
+  const d=t.dataset;
+  if(d.mode){st.mode=d.mode;st.sel=-1}
+  else if(d.view)st.view=d.view;
+  else if(d.sort){if(st.sort[st.mode]===d.sort)st.asc=!st.asc;else{st.sort[st.mode]=d.sort;st.asc=['name','user','cmd','state'].includes(d.sort)}}
+  else if(d.tog!==undefined){e.stopPropagation();const i=+d.tog,n=st.col.has(i)||!st.exp.has(i);
+    const isCol=t.textContent==='▸';if(isCol){st.col.delete(i);st.exp.add(i)}else{st.col.add(i);st.exp.delete(i)}}
+  else if(d.sel!==undefined){st.sel=+d.sel;let j=P[st.sel][1];while(j>=0){st.col.delete(j);st.exp.add(j);j=P[j][1]}}
+  else if(d.step){st.snap=Math.max(0,Math.min(S.length-1,st.snap+ +d.step))}
+  else if(d.peak){st.snap=EX.peak}
+  else if(d.row!==undefined){const i=+d.row;st.sel=st.sel===i?-1:i}
+  syncBtns();render();
+});
+root.querySelector('input[type=search]').addEventListener('input',e=>{st.q=e.target.value;render()});
+root.querySelector('.px-all').addEventListener('change',e=>{st.all=e.target.checked;render()});
+root.querySelector('input[type=range]').addEventListener('input',e=>{st.snap=+e.target.value;render()});
+window.pickTime=t=>{if(!S.length)return;let b=0,bd=1e18;S.forEach((s,j)=>{const d=Math.abs(s.t-t);if(d<bd){bd=d;b=j}});
+  st.mode='snap';st.snap=b;st.sel=-1;syncBtns();render();document.getElementById('px-card').scrollIntoView({behavior:'smooth'})};
+syncBtns();render();
+})();
+'''
+
+
+def power_html(pw):
+    if not pw:
+        return ""
+    def v(x, d=0, unit=""):
+        return "—" if x is None else f"{nf(x, d)}{unit}"
+    tiles = []
+    if pw["has_bat"]:
+        tiles.append(f'<div class="card tile"><div class="k">Batterie</div><div class="v">{v(pw["bat_last"], 0, " %")}</div>'
+                     f'<div class="d">min {v(pw["bat_min"], 0, " %")} · sur secteur {v((pw["plugged_pct"] or 0) * 100, 0, " %")} du temps</div></div>')
+        tiles.append(f'<div class="card tile"><div class="k">Santé batterie</div><div class="v">{v(pw["health"], 0, " %")}</div>'
+                     f'<div class="d">{v(pw["cycles"])} cycles · {v(pw["raw_max"])} / {v(pw["design"])} mAh</div></div>')
+    if pw["has_temp"]:
+        tiles.append(f'<div class="card tile"><div class="k">Température CPU</div><div class="v">{v(pw["cpu_temp_avg"], 0, " °C")}</div>'
+                     f'<div class="d">pic {v(pw["cpu_temp_max"], 0, " °C")} · GPU pic {v(pw["gpu_temp_max"], 0, " °C")}</div></div>')
+    if pw["bat_temp_max"] is not None:
+        tiles.append(f'<div class="card tile"><div class="k">Température batterie max</div><div class="v">{v(pw["bat_temp_max"], 1, " °C")}</div>'
+                     f'<div class="d">au-delà de 35 °C, la batterie s\'use plus vite</div></div>')
+    if pw["sys_w_avg"] is not None:
+        tiles.append(f'<div class="card tile"><div class="k">Consommation moy.</div><div class="v">{v(pw["sys_w_avg"], 1, " W")}</div>'
+                     f'<div class="d">pic {v(pw["sys_w_max"], 0, " W")} · CPU {v(pw["cpu_w_avg"], 1, " W")} · GPU {v(pw["gpu_w_avg"], 1, " W")}</div></div>')
+    if pw["has_fan"]:
+        tiles.append(f'<div class="card tile"><div class="k">Ventilateurs max</div><div class="v">{v(pw["fan_max"])} tr/min</div>'
+                     f'<div class="d">limite {v(pw["fan_limit"])} tr/min</div></div>')
+    leg = lambda items: '<div class="legend">' + "".join(f'<span><i style="background:var({c})"></i>{n}</span>' for c, n in items) + "</div>"
+    charts = []
+    if pw["has_bat"]:
+        charts.append('<div class="card"><h2>Batterie (%)</h2>' + leg([("--s1", "Charge"), ("--band", "Sur secteur")]) + '<div class="chart" id="c-bat"></div></div>')
+    if pw["has_temp"] or pw["bat_temp_max"] is not None:
+        items = ([("--s1", "CPU"), ("--s2", "GPU")] if pw["has_temp"] else []) + ([("--s3", "Batterie")] if pw["bat_temp_max"] is not None else [])
+        charts.append('<div class="card"><h2>Températures (°C)</h2>' + leg(items) + '<div class="chart" id="c-temp"></div></div>')
+    if pw["sys_w_avg"] is not None:
+        charts.append('<div class="card"><h2>Puissance (W)</h2>' + leg([("--s1", "Système"), ("--s2", "CPU"), ("--s3", "GPU")]) + '<div class="chart" id="c-pow"></div></div>')
+    if pw["has_fan"]:
+        charts.append('<div class="card"><h2>Ventilateurs (tr/min, le plus rapide)</h2><div class="chart" id="c-fan"></div></div>')
+    return ('<section id="power"><h2 style="font-size:17px;margin:24px 0 12px">Énergie et températures</h2>'
+            f'<div class="tiles">{"".join(tiles)}</div><div class="grid2">{"".join(charts)}</div></section>')
+
+
+def render_html(title, start, end, t, top_cpu, top_mem, peaks, dirs, day, prev_day, data, explorer=None, power=None):
+    e = html.escape
+    def when(ts, fmt="%d/%m %H:%M"):
+        return dt.datetime.fromtimestamp(ts).strftime(fmt)
+    def bars(rows, val, fmt, sub):
+        mx = max((val(r) for r in rows), default=1) or 1
+        out = []
+        for r in rows:
+            v = val(r)
+            out.append(f'<div class="bar-row"><div class="bar-label" title="{e(r[0])}">{e(r[0])}</div>'
+                       f'<div class="bar-track"><div class="bar" style="width:{max(1, 100 * v / mx):.1f}%"></div></div>'
+                       f'<div class="bar-val">{fmt(v)}<span>{sub(r)}</span></div></div>')
+        return "\n".join(out)
+    nS = t["samples"]
+    cpu_bars = bars(top_cpu, lambda r: r[1] / nS, lambda v: nf(v) + " %", lambda r: f"pic {nf(r[2], 0)} %")
+    mem_bars = bars(top_mem, lambda r: gb(r[3] / nS), lambda v: nf(v, 2) + " Go", lambda r: f"pic {nf(gb(r[4]), 2)} Go")
+    peak_html = "".join(
+        f"<tr><td>{when(ts)}</td><td class=num>{nf(l, 1)}</td><td class=num>{nf(cpu, 0)} %</td>"
+        f"<td>{', '.join(f'{e(n)} <span class=dim>{nf(c, 0)} %</span>' for n, c in procs)}</td></tr>"
+        for ts, l, cpu, procs in peaks)
+    def delta(d):
+        if d is None:
+            return '<span class="dim">nouveau</span>'
+        if abs(d) < 50 * 1024:
+            return '<span class="dim">=</span>'
+        return f'<span class="{"up" if d > 0 else "down"}">{"+" if d > 0 else "−"}{fmt_size(abs(d))}</span>'
+    dir_html = "".join(f"<tr><td class=path title='{e(p)}'>{e(short_path(p))}</td><td class=num>{fmt_size(kb)}</td>"
+                       f"<td class=num>{delta(d)}</td></tr>" for p, kb, d in dirs)
+    dir_note = (f"Scan du {day}" + (f", comparé au {prev_day}" if prev_day else "") + ".") if day else \
+        "Pas encore de scan des dossiers : il tourne une fois par jour (ou <code>sysstats du</code>)."
+    sat = t["load_max"] / t["ncpu"]
+    disk_pct = 100 * t["disk_used"] / t["disk_total"]
+    return f"""<!doctype html><html lang="fr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><script>try{{const t=localStorage.getItem('sysstats-theme');if(t==='light'||t==='dark')document.documentElement.dataset.theme=t}}catch(e){{}}</script><title>Charge machine — {e(title)}</title>
+<style>
+/* Catppuccin : Latte (clair) / Macchiato (sombre) */
+:root{{--page:#e6e9ef;--surface:#eff1f5;--ink:#4c4f69;--ink2:#5c5f77;--muted:#6c6f85;--grid:#ccd0da;--axis:#bcc0cc;
+--s1:#1e66f5;--s2:#fe640b;--s3:#8839ef;--band:#40a02b33;--up:#d20f39;--down:#40a02b;--warn:#df8e1d;--border:#ccd0da;--on-s1:#eff1f5;color-scheme:light}}
+@media (prefers-color-scheme:dark){{:root:not([data-theme=light]){{--page:#1e2030;--surface:#24273a;--ink:#cad3f5;--ink2:#b8c0e0;--muted:#a5adcb;
+--grid:#363a4f;--axis:#494d64;--s1:#8aadf4;--s2:#f5a97f;--s3:#c6a0f6;--band:#a6da9533;--up:#ed8796;--down:#a6da95;--warn:#eed49f;--border:#363a4f;--on-s1:#181926;color-scheme:dark}}}}
+:root[data-theme=dark]{{--page:#1e2030;--surface:#24273a;--ink:#cad3f5;--ink2:#b8c0e0;--muted:#a5adcb;
+--grid:#363a4f;--axis:#494d64;--s1:#8aadf4;--s2:#f5a97f;--s3:#c6a0f6;--band:#a6da9533;--up:#ed8796;--down:#a6da95;--warn:#eed49f;--border:#363a4f;--on-s1:#181926;color-scheme:dark}}
+.themesw{{display:inline-flex;border:1px solid var(--axis);border-radius:7px;overflow:hidden;flex:none}}
+.themesw button{{border:0;background:transparent;color:var(--ink2);padding:5px 10px;font:inherit;font-size:12px;cursor:pointer}}
+.themesw button.on{{background:var(--s1);color:var(--on-s1)}}
+.head{{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}}
+*{{box-sizing:border-box}}body{{margin:0;background:var(--page);color:var(--ink);font:14px/1.45 -apple-system,BlinkMacSystemFont,"Inter",sans-serif;font-variant-numeric:tabular-nums}}
+main{{max-width:1180px;margin:0 auto;padding:24px 16px 48px}}h1{{font-size:22px;margin:0 0 4px}}h2{{font-size:15px;margin:0 0 12px}}
+.sub{{color:var(--ink2);margin:0 0 20px}}.dim{{color:var(--muted)}}
+.tiles{{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:16px}}
+.card{{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px}}
+.tile .k{{color:var(--ink2);font-size:12px}}.tile .v{{font-size:24px;font-weight:600;margin:2px 0}}.tile .d{{color:var(--muted);font-size:12px}}
+.grid2{{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(520px,100%),1fr));gap:16px;margin-bottom:16px}}
+.chart{{position:relative}}.chart svg{{width:100%;height:220px;display:block}}
+.legend{{display:flex;gap:14px;font-size:12px;color:var(--ink2);margin:-4px 0 8px}}.legend i{{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}}
+.tip{{position:absolute;pointer-events:none;background:var(--surface);border:1px solid var(--axis);border-radius:6px;padding:6px 8px;font-size:12px;white-space:nowrap;display:none;box-shadow:0 2px 8px #0002}}
+.bar-row{{display:grid;grid-template-columns:minmax(0,190px) 1fr 130px;gap:10px;align-items:center;margin:5px 0}}
+.bar-label{{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}.bar-track{{height:10px}}
+.bar{{height:100%;background:var(--s1);border-radius:0 4px 4px 0}}.bar-val{{text-align:right;font-weight:600}}.bar-val span{{display:block;font-weight:400;font-size:11px;color:var(--muted)}}
+table{{width:100%;border-collapse:collapse}}td,th{{padding:6px 8px;border-bottom:1px solid var(--grid);text-align:left;vertical-align:top}}
+th{{font-size:12px;color:var(--ink2);font-weight:500}}.num{{text-align:right;white-space:nowrap}}.path{{word-break:break-all}}
+.up{{color:var(--up)}}.down{{color:var(--down)}}code{{font-size:12px}}
+@media (max-width:560px){{.bar-row{{grid-template-columns:minmax(0,1fr) 90px}}.bar-track{{display:none}}}}
+{EXPLORER_CSS}
+</style></head><body><main>
+<div class="head"><h1>Charge machine — {e(title)}</h1><span class="themesw" role="group" aria-label="Thème"><button data-theme-set="auto">Auto</button><button data-theme-set="light">Clair</button><button data-theme-set="dark">Sombre</button></span></div>
+<p class="sub">{when(start)} → {when(end)} · {nS} échantillons (toutes les 5 min) · généré le {dt.datetime.now().strftime("%d/%m/%Y %H:%M")}</p>
+<div class="tiles">
+<div class="card tile"><div class="k">CPU moyen</div><div class="v">{nf(t["cpu_avg"], 0)} %</div><div class="d">pic {nf(t["cpu_max"], 0)} %</div></div>
+<div class="card tile"><div class="k">Charge (load) max</div><div class="v">{nf(t["load_max"])}</div><div class="d">{nf(sat * 100, 0)} % de {t["ncpu"]} cœurs · moy. {nf(t["load_avg"])}</div></div>
+<div class="card tile"><div class="k">RAM utilisée moy.</div><div class="v">{nf(t["mem_avg"])} Go</div><div class="d">pic {nf(t["mem_max"])} / {nf(t["mem_total"], 0)} Go</div></div>
+<div class="card tile"><div class="k">Swap max</div><div class="v">{nf(t["swap_max"])} Go</div><div class="d">mémoire libre min. {t["pressure_min"]} %</div></div>
+<div class="card tile"><div class="k">Disque</div><div class="v">{nf(disk_pct, 0)} %</div><div class="d">{nf(t["disk_used"], 0)} / {nf(t["disk_total"], 0)} Go · {"+" if t["disk_delta"] >= 0 else "−"}{nf(abs(t["disk_delta"]))} Go sur la période</div></div>
+</div>
+<div class="grid2">
+<div class="card"><h2>CPU (user + sys, %)</h2><div class="chart" id="c-cpu"></div></div>
+<div class="card"><h2>Charge (load average 1 min) — {t["ncpu"]} cœurs = saturation</h2><div class="chart" id="c-load"></div></div>
+<div class="card"><h2>Mémoire (Go)</h2><div class="legend"><span><i style="background:var(--s1)"></i>RAM utilisée</span><span><i style="background:var(--s2)"></i>Swap</span></div><div class="chart" id="c-mem"></div></div>
+<div class="card"><h2>Moments les plus chargés</h2><table><tr><th>Quand</th><th class=num>Load</th><th class=num>CPU</th><th>Process en tête</th></tr>{peak_html}</table></div>
+</div>
+{power_html(power)}
+<div class="grid2">
+<div class="card"><h2>Process — CPU moyen (% d'un cœur)</h2>{cpu_bars}</div>
+<div class="card"><h2>Process — RAM moyenne</h2>{mem_bars}</div>
+</div>
+{EXPLORER_HTML if explorer else ""}
+<div class="card"><h2>Plus gros dossiers</h2><p class="sub" style="margin:-6px 0 8px">{dir_note}</p>
+<table><tr><th>Dossier</th><th class=num>Taille</th><th class=num>Évolution</th></tr>{dir_html}</table></div>
+<p class="sub" style="margin-top:16px">Les process sont regroupés par application (les helpers Chrome sous « Google Chrome ») ou par script pour Python/Node. Données : <code>{e(short_path(DB))}</code></p>
+</main>
+<script>
+const D={json.dumps(data)};
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const fmtT=t=>{{const d=new Date(t*1000);return D.range_days>1.5?d.toLocaleDateString('fr-FR',{{day:'2-digit',month:'2-digit'}})+' '+d.toLocaleTimeString('fr-FR',{{hour:'2-digit',minute:'2-digit'}}):d.toLocaleTimeString('fr-FR',{{hour:'2-digit',minute:'2-digit'}})}};
+function chart(id,series,unit,yMaxMin,refLine,band){{
+  const el=document.getElementById(id),P=D.points;if(!P.length)return;
+  const W=Math.max(320,el.clientWidth),H=220,L=40,R=10,T=10,B=24,NS='http://www.w3.org/2000/svg';
+  let raw=Math.max(yMaxMin,...series.flatMap(s=>P.map(p=>p[s.k]??0)),refLine||0)*1.05,st=Math.pow(10,Math.floor(Math.log10(raw/4)));st=[1,2,2.5,5,10].map(m=>m*st).find(v=>v*4>=raw);let ymax=st*4;if(unit==='%'&&raw<=105)ymax=100;
+  const t0=P[0].t,t1=P[P.length-1].t||t0+1,x=t=>L+(W-L-R)*(t-t0)/Math.max(1,t1-t0),y=v=>T+(H-T-B)*(1-v/ymax);
+  let s=`<svg xmlns="${{NS}}" viewBox="0 0 ${{W}} ${{H}}" style="height:${{H}}px">`;
+  for(let i=0;i<=4;i++){{const v=ymax*i/4,yy=y(v);s+=`<line x1="${{L}}" x2="${{W-R}}" y1="${{yy}}" y2="${{yy}}" stroke="${{css(i?'--grid':'--axis')}}"/><text x="${{L-6}}" y="${{yy+4}}" text-anchor="end" font-size="11" fill="${{css('--muted')}}">${{v.toFixed(ymax<10?1:0)}}</text>`}}
+  const nt=Math.min(6,P.length);for(let i=0;i<nt;i++){{const t=t0+(t1-t0)*i/Math.max(1,nt-1);s+=`<text x="${{x(t)}}" y="${{H-6}}" text-anchor="${{i==0?'start':i==nt-1?'end':'middle'}}" font-size="11" fill="${{css('--muted')}}">${{fmtT(t)}}</text>`}}
+  if(band){{let b0=null;P.forEach((p,j)=>{{const on=p[band]===1;if(on&&b0===null)b0=p.t;
+    if(b0!==null&&(!on||j===P.length-1)){{const b1=on?p.t:p.t;s+=`<rect x="${{x(b0)}}" y="${{T}}" width="${{Math.max(2,x(b1)-x(b0))}}" height="${{H-T-B}}" fill="${{css('--band')}}"/>`;b0=null}}}})}}
+  if(refLine)s+=`<line x1="${{L}}" x2="${{W-R}}" y1="${{y(refLine)}}" y2="${{y(refLine)}}" stroke="${{css('--warn')}}" stroke-dasharray="4 4"/>`;
+  for(const se of series){{const segs=[[]];P.forEach(p=>{{if(p[se.k]==null){{if(segs[segs.length-1].length)segs.push([])}}else segs[segs.length-1].push(p)}});
+    for(const g of segs){{if(!g.length)continue;const pts=g.map(p=>`${{x(p.t).toFixed(1)}},${{y(p[se.k]).toFixed(1)}}`).join(' ');
+    if(se.fill)s+=`<polygon points="${{x(g[0].t)}},${{y(0)}} ${{pts}} ${{x(g[g.length-1].t)}},${{y(0)}}" fill="${{css(se.c)}}" opacity=".14"/>`;
+    s+=`<polyline points="${{pts}}" fill="none" stroke="${{css(se.c)}}" stroke-width="2" stroke-linejoin="round"/>`}}}}
+  s+=`<line id="${{id}}-x" y1="${{T}}" y2="${{H-B}}" stroke="${{css('--axis')}}" visibility="hidden"/>`;
+  for(const se of series)s+=`<circle id="${{id}}-${{se.k}}" r="4" fill="${{css(se.c)}}" stroke="${{css('--surface')}}" stroke-width="2" visibility="hidden"/>`;
+  el.innerHTML=s+'</svg><div class="tip"></div>';
+  const svg=el.querySelector('svg'),tip=el.querySelector('.tip'),xl=el.querySelector(`#${{id}}-x`);
+  svg.addEventListener('mousemove',ev=>{{const r=svg.getBoundingClientRect(),mx=(ev.clientX-r.left)*W/r.width;
+    let i=0,bd=1e18;P.forEach((p,j)=>{{const d=Math.abs(x(p.t)-mx);if(d<bd){{bd=d;i=j}}}});const p=P[i],xx=x(p.t);
+    xl.setAttribute('x1',xx);xl.setAttribute('x2',xx);xl.setAttribute('visibility','visible');
+    for(const se of series){{const c=el.querySelector(`#${{id}}-${{se.k}}`);if(p[se.k]==null){{c.setAttribute('visibility','hidden');continue}}c.setAttribute('cx',xx);c.setAttribute('cy',y(p[se.k]));c.setAttribute('visibility','visible')}}
+    tip.innerHTML=`<b>${{new Date(p.t*1000).toLocaleString('fr-FR',{{weekday:'short',hour:'2-digit',minute:'2-digit'}})}}</b><br>`+series.filter(se=>p[se.k]!=null).map(se=>`${{se.n}} : <b>${{p[se.k].toLocaleString('fr-FR')}} ${{unit}}</b>`).join('<br>')+(band&&p[band]===1?'<br><span style="color:var(--muted)">sur secteur</span>':'');
+    tip.dataset.t=p.t;tip.style.display='block';const px=xx*r.width/W;tip.style.left=Math.min(px+12,r.width-tip.offsetWidth)+'px';tip.style.top='8px'}});
+  svg.style.cursor='pointer';svg.addEventListener('click',()=>{{if(window.pickTime&&tip.dataset.t)pickTime(+tip.dataset.t)}});
+  svg.addEventListener('mouseleave',()=>{{tip.style.display='none';el.querySelectorAll('svg [visibility]').forEach(n=>n.setAttribute('visibility','hidden'))}});
+}}
+function draw(){{chart('c-cpu',[{{k:'cpu',n:'CPU',c:'--s1',fill:1}}],'%',100);
+chart('c-load',[{{k:'load',n:'Load',c:'--s1',fill:1}}],'',{t["ncpu"]},{t["ncpu"]});
+chart('c-mem',[{{k:'mem',n:'RAM',c:'--s1'}},{{k:'swap',n:'Swap',c:'--s2'}}],'Go',{nf(t["mem_total"], 0).replace(",", ".")});
+const has=id=>document.getElementById(id);
+if(has('c-bat'))chart('c-bat',[{{k:'bat',n:'Charge',c:'--s1',fill:1}}],'%',100,0,'plug');
+if(has('c-temp'))chart('c-temp',[{{k:'ctemp',n:'CPU',c:'--s1'}},{{k:'gtemp',n:'GPU',c:'--s2'}},{{k:'btemp',n:'Batterie',c:'--s3'}}],'°C',50);
+if(has('c-pow'))chart('c-pow',[{{k:'sysw',n:'Système',c:'--s1',fill:1}},{{k:'cpuw',n:'CPU',c:'--s2'}},{{k:'gpuw',n:'GPU',c:'--s3'}}],'W',10);
+if(has('c-fan'))chart('c-fan',[{{k:'fan',n:'Ventilateur',c:'--s1',fill:1}}],'tr/min',1000);}}
+draw();let rt;addEventListener('resize',()=>{{clearTimeout(rt);rt=setTimeout(draw,150)}});
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change',draw);
+function setTheme(t){{const r=document.documentElement;if(t==='auto')delete r.dataset.theme;else r.dataset.theme=t;
+  try{{t==='auto'?localStorage.removeItem('sysstats-theme'):localStorage.setItem('sysstats-theme',t)}}catch(e){{}}
+  document.querySelectorAll('[data-theme-set]').forEach(b=>b.classList.toggle('on',b.dataset.themeSet===t));draw()}}
+document.querySelectorAll('[data-theme-set]').forEach(b=>b.addEventListener('click',()=>setTheme(b.dataset.themeSet)));
+document.querySelectorAll('[data-theme-set]').forEach(b=>b.classList.toggle('on',b.dataset.themeSet===(document.documentElement.dataset.theme||'auto')));
+</script>
+<script>const EX={json.dumps(explorer, separators=(",", ":"))};</script>
+<script>{EXPLORER_JS}</script>
+</body></html>"""
+
+
+def report(args):
+    now = time.time()
+    if args.date:
+        d = dt.date.fromisoformat(args.date)
+        start = int(time.mktime(d.timetuple()))
+        end = start + 86400
+        title, name = d.strftime("%A %d/%m/%Y"), f"{d.isoformat()}.html"
+    else:
+        hours = args.days * 24 if args.days else (args.hours or 24)
+        start, end = int(now - hours * 3600), int(now) + 1
+        title = f"{args.days} derniers jours" if args.days else f"{hours} dernières heures"
+        name = f"demande-{dt.datetime.now().strftime('%Y-%m-%d_%H%M')}.html"
+    path = build_report(start, end, title, os.path.join(REPORTS, name))
+    record("report", path is not None, path or "aucun échantillon")
+    if not path:
+        print("Aucun échantillon sur cette période (la collecte tourne-t-elle ? `sysstats status`).", file=sys.stderr)
+        return 1
+    print(path)
+    if not args.no_open:
+        subprocess.run(["open", path])
+    return 0
+
+
+def daily():
+    du_scan()
+    d = (dt.datetime.now() - dt.timedelta(hours=6)).date()  # lancé après minuit au réveil → la veille
+    start = int(time.mktime(d.timetuple()))
+    path = build_report(start, start + 86400, d.strftime("%A %d/%m/%Y"), os.path.join(REPORTS, f"{d.isoformat()}.html"))
+    if path:
+        print(path)
+    return path
+
+
+def record(job, ok, detail=""):
+    try:
+        c = db()
+        with c:
+            c.execute("INSERT OR REPLACE INTO runs VALUES(?,?,?,?)", (job, int(time.time()), int(bool(ok)), detail[:300]))
+        c.close()
+    except Exception:
+        pass
+
+
+# ---------------------------------------------------------------- launchd
+
+LABELS = {"collect": "local.sysstats.collect", "daily": "local.sysstats.daily"}
+AGENTS = os.path.join(HOME, "Library", "LaunchAgents")
+SCHEDULES = {
+    "collect": "<key>StartInterval</key><integer>300</integer>\n  <key>RunAtLoad</key><true/>",
+    "daily": "<key>StartCalendarInterval</key><dict><key>Hour</key><integer>23</integer>"
+             "<key>Minute</key><integer>55</integer></dict>",
+}
+
+
+def plist(job):
+    exe = os.path.join(HOME, ".local", "bin", "sysstats")
+    log = os.path.join(BASE, f"{job}.log")
+    return f"""<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>{LABELS[job]}</string>
+  <key>ProgramArguments</key><array><string>/usr/bin/python3</string><string>{exe}</string><string>{job}</string></array>
+  {SCHEDULES[job]}
+  <key>Nice</key><integer>10</integer>
+  <key>LowPriorityIO</key><true/>
+  <key>ProcessType</key><string>Background</string>
+  <key>StandardOutPath</key><string>{log}</string>
+  <key>StandardErrorPath</key><string>{log}</string>
+</dict></plist>
+"""
+
+
+def install():
+    if sys.platform != "darwin":
+        print("sysstats install : macOS uniquement (launchd).", file=sys.stderr)
+        return 1
+    os.makedirs(AGENTS, exist_ok=True)
+    os.makedirs(BASE, exist_ok=True)
+    domain = f"gui/{os.getuid()}"
+    for job, label in LABELS.items():
+        path = os.path.join(AGENTS, f"{label}.plist")
+        subprocess.run(["launchctl", "bootout", f"{domain}/{label}"], capture_output=True)
+        with open(path, "w") as f:
+            f.write(plist(job))
+        r = subprocess.run(["launchctl", "bootstrap", domain, path], capture_output=True, text=True)
+        print(f"{'✓' if r.returncode == 0 else '✗'} {label}  {r.stderr.strip()}")
+    db().close()
+    return 0
+
+
+def uninstall():
+    domain = f"gui/{os.getuid()}"
+    for label in LABELS.values():
+        subprocess.run(["launchctl", "bootout", f"{domain}/{label}"], capture_output=True)
+        path = os.path.join(AGENTS, f"{label}.plist")
+        if os.path.exists(path):
+            os.remove(path)
+        print(f"✓ {label} retiré")
+    print(f"Données conservées dans {BASE}")
+    return 0
+
+
+def launchd_state(label):
+    out = sh(["launchctl", "print", f"gui/{os.getuid()}/{label}"], timeout=10)
+    if not out:
+        return "non chargé"
+    m = re.search(r"last exit code = (\S+)", out)
+    code = m.group(1) if m else ""
+    if not code or code.startswith("("):
+        return "chargé, pas encore exécuté"
+    return "chargé, OK" if code == "0" else f"chargé, dernier code de sortie {code}"
+
+
+def status():
+    c = db()
+    n, first, last = c.execute("SELECT COUNT(*), MIN(ts), MAX(ts) FROM samples").fetchone()
+    ndays, last_day = c.execute("SELECT COUNT(DISTINCT day), MAX(day) FROM dirs").fetchone()
+    runs = {r[0]: r[1:] for r in c.execute("SELECT job, ts, ok, detail FROM runs")}
+    c.close()
+    f = lambda ts: dt.datetime.fromtimestamp(ts).strftime("%a %d/%m %H:%M") if ts else "—"
+    def ago(ts):
+        if not ts:
+            return ""
+        m = int((time.time() - ts) / 60)
+        return f"(il y a {m} min)" if m < 120 else f"(il y a {m // 60} h)" if m < 2880 else f"(il y a {m // 1440} j)"
+    print("Derniers runs")
+    for job, label in (("collect", "collecte"), ("du", "scan dossiers"), ("daily", "rapport du jour"), ("report", "rapport à la demande")):
+        ts, ok, detail = runs.get(job, (None, 1, ""))
+        mark = "" if ok else "  ✗ " + detail
+        print(f"  {label:<22}{f(ts):<16}{ago(ts)}{mark}")
+    print("\nDonnées")
+    print(f"  échantillons          {n} (du {f(first)} au {f(last)})")
+    print(f"  scans dossiers        {ndays} (dernier : {last_day or '—'})")
+    reps = sorted((os.path.join(REPORTS, x) for x in os.listdir(REPORTS)), key=os.path.getmtime) if os.path.isdir(REPORTS) else []
+    print(f"  rapports              {len(reps)}" + (f" (dernier : {os.path.basename(reps[-1])})" if reps else ""))
+    if sys.platform == "darwin":
+        print("\nTâches launchd")
+        for job, label in LABELS.items():
+            print(f"  {label:<26}{launchd_state(label)}")
+    print(f"\nbase : {short_path(DB)}\nrapports : {short_path(REPORTS)}")
+
+
+def main():
+    ap = argparse.ArgumentParser(prog="sysstats", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = ap.add_subparsers(dest="cmd", required=True)
+    for name in ("collect", "du", "daily", "status", "install", "uninstall", "path"):
+        sub.add_parser(name)
+    r = sub.add_parser("report")
+    g = r.add_mutually_exclusive_group()
+    g.add_argument("--date"); g.add_argument("--hours", type=int); g.add_argument("--days", type=int)
+    r.add_argument("--no-open", action="store_true")
+    a = ap.parse_args()
+    simple = {"status": status, "install": install, "uninstall": uninstall,
+              "path": lambda: print(REPORTS)}
+    if a.cmd in simple:
+        return simple[a.cmd]() or 0
+    if a.cmd == "report":
+        return report(a)
+    # tâches planifiées : on trace le résultat et les erreurs
+    jobs = {"collect": collect, "du": du_scan, "daily": daily}
+    try:
+        res = jobs[a.cmd]()
+        record(a.cmd, True, res or "")
+        if a.cmd == "daily":
+            record("du", True)
+    except Exception as exc:
+        record(a.cmd, False, f"{type(exc).__name__}: {exc}")
+        raise
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
