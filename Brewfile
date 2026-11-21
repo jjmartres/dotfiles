@@ -79,8 +79,6 @@ brew "vivid"                                    # Generator for the LS_COLORS en
 brew "watch"                                    # Executes a program periodically, showing output in full screen
 brew "wget"                                     # Tool to download files from the web
 brew "z"                                        # Jump to frequently used directories
-brew "zellij"                                   # Terminal session manager
-brew "zk"                                       # Zettelkasten CLI
 brew "zlib"                                     # Compression library
 brew "zoxide"                                   # Smarter cd command, learns your habits
 
