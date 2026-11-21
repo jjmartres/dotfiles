@@ -101,9 +101,14 @@ Local history of CPU / RAM / disk load, top processes and biggest folders, with 
 Package `sysstats/` (script `~/.local/bin/sysstats`, stdlib Python, system `/usr/bin/python3`)
 and fish function `sysreport` (with completion).
 
-- Every 5 min (`local.sysstats.collect`): load, CPU, RAM, swap, disk, top 25 processes.
+- Every 5 min (`local.sysstats.collect`): load, CPU, RAM, swap, disk, top 25 processes, and the
+  process tree (pid/ppid, user, state, threads, full command; CPU measured from the CPU time used
+  between samples). Significant processes are kept with their whole parent chain (30 days).
 - Daily at 23:55 (`local.sysstats.daily`): folder size scan + report of the day.
 - Data: `~/.local/share/sysstats/` (`stats.db`, `reports/`, `*.log`), kept 90 days.
+- Report: Catppuccin Latte / Macchiato, key figures, charts, rankings, biggest folders, and an
+  htop/btop-like process explorer: parent → child tree with subtree totals (Σ), period or
+  snapshot mode (slider, or click a chart), sort, filter, per-process detail with sparklines.
 
 `bootstrap.sh` enables it automatically (post-stow hook). On an existing machine:
 

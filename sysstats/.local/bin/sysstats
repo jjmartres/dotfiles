@@ -25,6 +25,9 @@ BASE = os.path.join(HOME, ".local", "share", "sysstats")
 DB = os.path.join(BASE, "stats.db")
 REPORTS = os.path.join(BASE, "reports")
 RETENTION_DAYS = 90
+TREE_RETENTION_DAYS = 30  # détail par process (arbre), plus volumineux
+TREE_MIN_CPU = 0.5        # % d'un cœur : en dessous, un process n'est gardé que comme parent
+TREE_MIN_RSS = 50 << 20   # 50 Mo
 TOP_N = 25
 DU_MIN_KB = 200 * 1024  # on ne garde que les dossiers >= 200 Mo
 DU_TARGETS = [(HOME, 3), ("/Applications", 1), ("/opt/homebrew", 2), ("/Library", 1)]
@@ -33,7 +36,8 @@ INTERPRETERS = {"python", "python3", "Python", "node", "ruby", "perl", "bash", "
 
 def sh(args, timeout=60):
     try:
-        return subprocess.run(args, capture_output=True, text=True, timeout=timeout).stdout
+        env = dict(os.environ, LC_ALL="C", LANG="C")  # dates et nombres de ps/top en format fixe
+        return subprocess.run(args, capture_output=True, text=True, timeout=timeout, env=env).stdout
     except Exception:
         return ""
 
@@ -49,6 +53,12 @@ def db():
     CREATE INDEX IF NOT EXISTS procs_ts ON procs(ts);
     CREATE TABLE IF NOT EXISTS dirs(day TEXT, path TEXT, kb INTEGER, PRIMARY KEY(day, path));
     CREATE TABLE IF NOT EXISTS runs(job TEXT PRIMARY KEY, ts INTEGER, ok INTEGER, detail TEXT);
+    CREATE TABLE IF NOT EXISTS pinfo(pkey TEXT PRIMARY KEY, pid INTEGER, ppkey TEXT, ppid INTEGER, user TEXT,
+      start INTEGER, exe TEXT, args TEXT, label TEXT, first INTEGER, last INTEGER);
+    CREATE TABLE IF NOT EXISTS psamp(ts INTEGER, pkey TEXT, cpu REAL, pcpu REAL, rss INTEGER, th INTEGER, state TEXT);
+    CREATE INDEX IF NOT EXISTS psamp_ts ON psamp(ts);
+    CREATE TABLE IF NOT EXISTS cpu_last(pkey TEXT PRIMARY KEY, cputime REAL, ts INTEGER);
+    CREATE TABLE IF NOT EXISTS sysextra(ts INTEGER PRIMARY KEY, nprocs INTEGER, nthreads INTEGER);
     """)
     return c
 
@@ -61,6 +71,9 @@ def proc_label(command):
     m = re.match(r"(.*?/([^/]+)\.app)/", command)
     base = os.path.basename(exe)
     if re.sub(r"[\d.]+$", "", base) in INTERPRETERS or base in INTERPRETERS:
+        interp = re.sub(r"[\d.]+$", "", base).lower()
+        if len(parts) > 2 and parts[1] in ("-c", "-m"):
+            return f"{interp} {parts[1]} {os.path.basename(parts[2]) if parts[1] == '-m' else ''}".strip()[:60]
         for a in parts[1:]:
             if not a.startswith("-"):
                 interp = re.sub(r"[\d.]+$", "", base).lower()
@@ -69,6 +82,84 @@ def proc_label(command):
     if m and not m.group(2).startswith("Python"):
         return m.group(2)
     return base[:60] or "?"
+
+
+def cpu_seconds(s):
+    """Temps CPU de ps : [jj-][hh:]mm:ss.cc"""
+    days = 0
+    if "-" in s:
+        d, s = s.split("-", 1)
+        days = int(d)
+    sec = 0.0
+    for part in s.split(":"):
+        sec = sec * 60 + float(part.replace(",", "."))
+    return days * 86400 + sec
+
+
+def snapshot_tree(c, ts):
+    """Arbre complet des process. Le CPU vient du temps CPU consommé depuis l'échantillon précédent."""
+    exe = {}
+    for line in sh(["ps", "-Axo", "pid=,comm="]).splitlines():
+        p = line.strip().split(None, 1)
+        if len(p) == 2 and p[0].isdigit():
+            exe[int(p[0])] = p[1]
+    threads = {}
+    for line in sh(["ps", "-AM"]).splitlines()[1:]:  # une ligne par thread ; USER vide sur les lignes suivantes
+        tok = line.split()
+        if not tok:
+            continue
+        pid = tok[0] if line[:1].isspace() else (tok[1] if len(tok) > 1 else "")
+        if pid.isdigit():
+            threads[int(pid)] = threads.get(int(pid), 0) + 1
+    procs = {}
+    for line in sh(["ps", "-Axww", "-o", "pid=,ppid=,user=,pcpu=,rss=,time=,state=,lstart=,args="]).splitlines():
+        p = line.split(None, 12)
+        if len(p) < 12 or not p[0].isdigit():
+            continue
+        try:
+            pid, ppid = int(p[0]), int(p[1])
+            start = int(time.mktime(time.strptime(" ".join(p[7:12]), "%a %b %d %H:%M:%S %Y")))
+            procs[pid] = {"pid": pid, "ppid": ppid, "user": p[2], "pcpu": float(p[3].replace(",", ".")),
+                          "rss": int(p[4]) * 1024, "cputime": cpu_seconds(p[5]), "state": p[6][:1],
+                          "start": start, "args": (p[12] if len(p) > 12 else "")[:600]}
+        except (ValueError, IndexError):
+            continue
+    for pr in procs.values():
+        pr["pkey"] = f"{pr['pid']}:{pr['start']}"
+    last = {k: (cpu, t) for k, cpu, t in c.execute("SELECT pkey, cputime, ts FROM cpu_last")}
+    prev_ts = max((t for _, t in last.values()), default=None)
+    for pr in procs.values():
+        if pr["pkey"] in last:
+            cpu0, t0 = last[pr["pkey"]]
+            pr["cpu"] = max(0.0, (pr["cputime"] - cpu0) / max(1, ts - t0) * 100)
+        elif prev_ts and pr["start"] >= prev_ts:  # né depuis le dernier échantillon
+            pr["cpu"] = pr["cputime"] / max(1, ts - pr["start"]) * 100
+        else:
+            pr["cpu"] = pr["pcpu"]
+    keep = set()
+    for pid, pr in procs.items():
+        if pr["cpu"] >= TREE_MIN_CPU or pr["pcpu"] >= 1 or pr["rss"] >= TREE_MIN_RSS:
+            while pid in procs and pid not in keep:  # le process et toute sa chaîne de parents
+                keep.add(pid)
+                pid = procs[pid]["ppid"]
+    rows_info, rows_samp = [], []
+    for pid in keep:
+        pr = procs[pid]
+        parent = procs.get(pr["ppid"])
+        args = pr["args"] or exe.get(pid, "")
+        rows_info.append((pr["pkey"], pid, parent["pkey"] if parent else None, pr["ppid"], pr["user"], pr["start"],
+                          exe.get(pid, args.split(" ")[0]), args, proc_label(args or exe.get(pid, "?")), ts, ts))
+        rows_samp.append((ts, pr["pkey"], round(pr["cpu"], 2), pr["pcpu"], pr["rss"], threads.get(pid, 0), pr["state"]))
+    c.executemany("""INSERT INTO pinfo VALUES(?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(pkey) DO UPDATE SET
+                     ppkey=excluded.ppkey, ppid=excluded.ppid, last=excluded.last""", rows_info)
+    c.executemany("INSERT INTO psamp VALUES(?,?,?,?,?,?,?)", rows_samp)
+    c.execute("DELETE FROM cpu_last")
+    c.executemany("INSERT INTO cpu_last VALUES(?,?,?)", [(pr["pkey"], pr["cputime"], ts) for pr in procs.values()])
+    c.execute("INSERT OR REPLACE INTO sysextra VALUES(?,?,?)", (ts, len(procs), sum(threads.values())))
+    cutoff = ts - TREE_RETENTION_DAYS * 86400
+    c.execute("DELETE FROM psamp WHERE ts < ?", (cutoff,))
+    c.execute("DELETE FROM pinfo WHERE last < ?", (cutoff,))
+    c.execute("DELETE FROM sysextra WHERE ts < ?", (cutoff,))
 
 
 def collect():
@@ -120,6 +211,7 @@ def collect():
                    free_pct, mb("used"), mb("total"), du.total, du.used))
         c.executemany("INSERT INTO procs VALUES(?,?,?,?,?)",
                       [(ts, k, round(v[0], 1), v[1], v[2]) for k, v in keep.items()])
+        snapshot_tree(c, ts)
         cutoff = ts - RETENTION_DAYS * 86400
         c.execute("DELETE FROM samples WHERE ts < ?", (cutoff,))
         c.execute("DELETE FROM procs WHERE ts < ?", (cutoff,))
@@ -229,7 +321,8 @@ def build_report(start, end, title, out_path):
     c.close()
 
     data = {"points": pts, "range_days": (end - start) / 86400}
-    html_text = render_html(title, start, end, tiles, top_cpu, top_mem, peak_rows, dirs, day, prev_day, data)
+    explorer = explorer_data(start, end, S, ncpu, mem_total)
+    html_text = render_html(title, start, end, tiles, top_cpu, top_mem, peak_rows, dirs, day, prev_day, data, explorer)
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     with open(out_path, "w") as f:
         f.write(html_text)
@@ -242,11 +335,311 @@ def build_report(start, end, title, out_path):
     return out_path
 
 
+def explorer_data(start, end, S, ncpu, mem_total):
+    """Arbre des process pour l'explorateur : agrégats sur la période + instantanés."""
+    c = db()
+    ts_list = [r[0] for r in S]
+    dts, prev = {}, None
+    for t in ts_list:
+        dts[t] = min(900, t - prev) if prev else 300
+        prev = t
+    agg, by_ts = {}, {}
+    for t, k, cpu, rss, th, st in c.execute(
+            "SELECT ts, pkey, cpu, rss, th, state FROM psamp WHERE ts>=? AND ts<?", (start, end)):
+        a = agg.get(k)
+        if a is None:
+            a = agg[k] = [0.0, 0.0, 0, 0, 0, t, t, 0]
+        a[0] += cpu / 100 * dts.get(t, 300)
+        a[1] = max(a[1], cpu); a[2] += rss; a[3] = max(a[3], rss); a[4] = max(a[4], th)
+        a[5] = min(a[5], t); a[6] = max(a[6], t); a[7] += 1
+        by_ts.setdefault(t, []).append((k, cpu, rss, th, st))
+    if not agg:
+        c.close()
+        return None
+    info = {}
+    todo = set(agg)
+    while todo:  # pinfo des process + parents manquants
+        ks = list(todo)
+        todo = set()
+        for i in range(0, len(ks), 500):
+            chunk = ks[i:i + 500]
+            q = "SELECT pkey,pid,ppkey,user,start,exe,args,label FROM pinfo WHERE pkey IN (%s)" % ",".join("?" * len(chunk))
+            for r in c.execute(q, chunk):
+                info[r[0]] = r
+                if r[2] and r[2] not in info and r[2] not in agg:
+                    todo.add(r[2])
+        todo -= set(info)
+    extra = dict((t, (n, th)) for t, n, th in c.execute("SELECT ts, nprocs, nthreads FROM sysextra WHERE ts>=? AND ts<?", (start, end)))
+    c.close()
+    keys = list(info)
+    idx = {k: i for i, k in enumerate(keys)}
+    procs = []
+    for k in keys:
+        _, pid, ppkey, user, st, exe, args, label = info[k]
+        procs.append([pid, idx.get(ppkey, -1), user, st, os.path.basename(exe or "")[:80], args or "", label])
+    aggs = []
+    for k in keys:
+        a = agg.get(k)
+        aggs.append([round(a[0], 1), round(a[1], 1), round(a[2] / a[7] / 1048576), round(a[3] / 1048576), a[4], a[5], a[6], a[7]]
+                    if a else None)
+    # instantanés : tous si raisonnable, sinon un échantillonnage régulier + les pics de charge
+    snap_ts = [t for t in ts_list if t in by_ts]
+    if len(snap_ts) > 600:
+        stride = len(snap_ts) / 480
+        chosen = {snap_ts[int(i * stride)] for i in range(480)}
+        load = {r[0]: r[1] for r in S}
+        chosen |= set(sorted(snap_ts, key=lambda t: -load[t])[:120])
+        snap_ts = sorted(chosen)
+    srow = {r[0]: r for r in S}
+    snaps = []
+    for t in snap_ts:
+        r = srow[t]
+        n, th = extra.get(t, (0, 0))
+        snaps.append({"t": t, "cpu": round((r[2] or 0) + (r[3] or 0), 1), "load": round(r[1], 2),
+                      "mem": round(r[6] / 1048576), "swap": round(r[7] / 1048576), "np": n, "nt": th,
+                      "rows": [[idx[k], round(cpu, 1), round(rss / 1048576), thr, st] for k, cpu, rss, thr, st in by_ts[t] if k in idx]})
+    peak = max(range(len(snaps)), key=lambda i: snaps[i]["load"]) if snaps else 0
+    return {"procs": procs, "agg": aggs, "snaps": snaps, "peak": peak, "ncpu": ncpu,
+            "memTotal": round(mem_total / 1048576), "period": end - start}
+
+
 def nf(x, d=1):
     return f"{x:.{d}f}".replace(".", ",")
 
 
-def render_html(title, start, end, t, top_cpu, top_mem, peaks, dirs, day, prev_day, data):
+
+# ---------------------------------------------------------------- explorateur de process (style htop/btop)
+
+EXPLORER_HTML = r'''<div class="card" id="px-card" style="margin-bottom:16px"><h2>Explorateur de process</h2>
+<p class="sub" style="margin:-6px 0 10px">Arbre père → fils. <b>Période</b> : ce que chaque process a consommé sur toute la période (temps CPU réel, mesuré entre deux échantillons). <b>Instantané</b> : l'arbre à un moment donné, comme htop. Clique sur une courbe CPU ou load pour y aller. Σ = total du process et de ses descendants.</p>
+<div id="px"></div></div>'''
+
+EXPLORER_CSS = r'''
+.px-bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
+.seg{display:inline-flex;border:1px solid var(--axis);border-radius:7px;overflow:hidden}
+.seg button{border:0;background:transparent;color:var(--ink2);padding:5px 11px;font:inherit;font-size:13px;cursor:pointer}
+.seg button.on{background:var(--s1);color:var(--on-s1)}
+.px-bar input[type=search]{flex:1;min-width:160px;padding:6px 9px;border:1px solid var(--axis);border-radius:7px;background:var(--page);color:var(--ink);font:inherit;font-size:13px}
+.px-bar label{font-size:13px;color:var(--ink2);display:flex;gap:5px;align-items:center}
+.px-count{font-size:12px;color:var(--muted);margin-left:auto}
+.px-snap{display:grid;grid-template-columns:auto 1fr auto;gap:8px 12px;align-items:center;margin-bottom:10px}
+.px-snap button{border:1px solid var(--axis);background:var(--page);color:var(--ink);border-radius:6px;padding:3px 9px;cursor:pointer;font:inherit}
+.px-snap input[type=range]{width:100%}
+.px-when{font-weight:600;white-space:nowrap}
+.px-meters{grid-column:1/-1;display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:6px 16px;font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace}
+.px-meters .mm{display:flex;align-items:center;gap:6px}.px-meters .mm b{width:44px;color:var(--ink2);font-weight:500}
+.px-meters .mm .track{flex:1;height:8px;background:var(--grid);border-radius:2px;overflow:hidden}.px-meters .mm .track i{display:block;height:100%;background:var(--s1)}
+.px-wrap{max-height:72vh;overflow:auto;border:1px solid var(--grid);border-radius:8px}
+table.pt{font:12.5px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace;border-collapse:separate;border-spacing:0;width:100%}
+table.pt th{position:sticky;top:0;background:var(--surface);z-index:1;cursor:pointer;user-select:none;white-space:nowrap;border-bottom:1px solid var(--axis);font-family:inherit}
+table.pt th.on{color:var(--ink)}table.pt th.on::after{content:" ▾"}table.pt th.on.asc::after{content:" ▴"}
+table.pt td{padding:3px 8px;border-bottom:1px solid var(--grid);white-space:nowrap}
+table.pt tr.r{cursor:pointer}table.pt tr.r:hover td{background:color-mix(in srgb,var(--s1) 8%,transparent)}
+table.pt tr.sel td{background:color-mix(in srgb,var(--s1) 16%,transparent)}
+table.pt td.nm{max-width:340px;overflow:hidden;text-overflow:ellipsis}
+table.pt td.cmd{color:var(--muted);max-width:420px;overflow:hidden;text-overflow:ellipsis}
+.cr{display:inline-block;width:14px;color:var(--muted)}.guide{color:var(--axis)}
+.sum{color:var(--muted);font-size:11px;margin-left:4px}
+.mt{display:inline-block;width:42px;height:8px;background:var(--grid);border-radius:2px;vertical-align:middle;margin-right:6px;overflow:hidden}
+.mt i{display:block;height:100%;background:var(--s1)}.mt i.hot{background:var(--s2)}
+.st-R{color:var(--down);font-weight:600}.st-Z,.st-U{color:var(--up);font-weight:600}
+tr.det td{white-space:normal;background:var(--page);padding:10px 12px 14px;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px}
+tr.det td>.det{position:sticky;left:12px;width:min(1100px,calc(100vw - 150px))}
+.det-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px 24px}
+.det code{display:block;white-space:pre-wrap;word-break:break-all;background:var(--surface);border:1px solid var(--grid);border-radius:6px;padding:8px;margin:4px 0 8px;font-size:12px}
+.det a{color:var(--s1);cursor:pointer;text-decoration:none}.det a:hover{text-decoration:underline}
+.det .k{color:var(--ink2);font-size:12px}.spark{width:100%;height:46px;display:block}
+'''
+
+EXPLORER_JS = r'''
+(()=>{
+if(typeof EX==='undefined'||!EX)return;
+const P=EX.procs,A=EX.agg,S=EX.snaps,NC=EX.ncpu,MT=EX.memTotal;
+const root=document.getElementById('px');
+const st={mode:'period',view:'tree',sort:{period:'cpusec',snap:'cpu'},asc:false,q:'',all:false,snap:EX.peak,sel:-1,col:new Set(),exp:new Set()};
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fr=(v,d=1)=>(+v).toLocaleString('fr-FR',{minimumFractionDigits:d,maximumFractionDigits:d});
+const mb=v=>v>=1024?fr(v/1024,1)+' Go':Math.round(v)+' Mo';
+const secs=s=>s>=3600?Math.floor(s/3600)+' h '+String(Math.floor(s%3600/60)).padStart(2,'0'):s>=60?Math.floor(s/60)+' min '+String(Math.floor(s%60)).padStart(2,'0'):fr(s,s<10?1:0)+' s';
+const hm=t=>new Date(t*1000).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+const day=t=>new Date(t*1000).toLocaleString('fr-FR',{weekday:'short',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+const meter=v=>`<span class="mt"><i class="${v>100?'hot':''}" style="width:${Math.min(100,v)}%"></i></span>`;
+
+const COLS={
+ period:[
+  {k:'name',h:'Process'},{k:'pid',h:'PID',n:1},{k:'user',h:'Util.'},
+  {k:'cpusec',h:'Temps CPU',n:1,sub:1},{k:'cpu',h:'CPU moy.',n:1},{k:'peak',h:'CPU pic',n:1},
+  {k:'rss',h:'RAM moy.',n:1,sub:1},{k:'rsspeak',h:'RAM pic',n:1},{k:'th',h:'Thr.',n:1},{k:'life',h:'Vu'},{k:'cmd',h:'Commande'}],
+ snap:[
+  {k:'name',h:'Process'},{k:'pid',h:'PID',n:1},{k:'user',h:'Util.'},{k:'state',h:'S'},
+  {k:'cpu',h:'CPU %',n:1,sub:1},{k:'mem',h:'MEM %',n:1},{k:'rss',h:'RSS',n:1,sub:1},{k:'th',h:'Thr.',n:1},
+  {k:'start',h:'Démarré',n:1},{k:'cmd',h:'Commande'}]};
+
+function metrics(){
+  const m=new Map();
+  if(st.mode==='period'){
+    A.forEach((a,i)=>{if(!a)return;const alive=Math.max(300,a[6]-a[5]+300);
+      m.set(i,{cpusec:a[0],cpu:a[0]/alive*100,peak:a[1],rss:a[2],rsspeak:a[3],th:a[4],first:a[5],last:a[6]})});
+  }else{
+    const s=S[st.snap];if(s)for(const r of s.rows)m.set(r[0],{cpu:r[1],rss:r[2],th:r[3],state:r[4],mem:r[2]/MT*100});
+  }
+  // les parents absents de la période restent comme nœuds de structure
+  for(const i of [...m.keys()]){let p=P[i][1];while(p>=0&&!m.has(p)){m.set(p,{cpusec:0,cpu:0,peak:0,rss:0,rsspeak:0,th:0,mem:0,state:'',ghost:1});p=P[p][1]}}
+  return m;
+}
+function tree(m){
+  const kids=new Map(),roots=[];
+  for(const i of m.keys()){
+    let p=P[i][1];
+    if(p<0||P[i][0]<=1||P[p][0]===0){roots.push(i);continue}
+    if(P[p][0]===1&&P[i][0]!==1){roots.push(i);continue}// enfants de launchd au premier niveau
+    (kids.get(p)||kids.set(p,[]).get(p)).push(i);
+  }
+  const sub=new Map();
+  const walk=i=>{const o=m.get(i);const s={cpusec:o.cpusec||0,cpu:o.cpu||0,rss:o.rss||0,n:1};
+    for(const c of kids.get(i)||[]){const t=walk(c);s.cpusec+=t.cpusec;s.cpu+=t.cpu;s.rss+=t.rss;s.n+=t.n}
+    sub.set(i,s);return s};
+  roots.forEach(walk);
+  return {kids,roots,sub};
+}
+function val(i,k,m,sub,useSub){
+  const o=m.get(i),p=P[i];
+  switch(k){
+    case 'name':return p[6].toLowerCase();case 'pid':return p[0];case 'user':return p[2];case 'cmd':return p[5];
+    case 'start':return p[3];case 'life':return o.first||0;case 'state':return o.state||'';
+    default:return useSub&&sub&&sub.has(i)&&(k in sub.get(i))?sub.get(i)[k]:(o[k]||0);
+  }
+}
+function render(){
+  const m=metrics(),T=tree(m),cols=COLS[st.mode],sk=st.sort[st.mode],q=st.q.trim().toLowerCase();
+  const isTree=st.view==='tree';
+  const cmp=(a,b)=>{const x=val(a,sk,m,T.sub,isTree),y=val(b,sk,m,T.sub,isTree);const r=x<y?-1:x>y?1:0;return st.asc?r:-r};
+  const match=i=>{const p=P[i];return p[6].toLowerCase().includes(q)||p[5].toLowerCase().includes(q)||String(p[0])===q||p[2].toLowerCase()===q};
+  let visible;
+  const totalSec=[...m.values()].reduce((s,o)=>s+(o.cpusec||0),0);
+  const significant=i=>{const s=T.sub.get(i);if(!s)return false;
+    return st.mode==='period'?(s.cpusec>=Math.max(2,totalSec*0.001)||s.rss>=150):(s.cpu>=0.5||s.rss>=100)};
+  if(q){visible=new Set();for(const i of m.keys())if(match(i)){let j=i;while(j>=0&&!visible.has(j)){visible.add(j);j=P[j][1]}}}
+  else if(!st.all){visible=new Set([...m.keys()].filter(significant))}
+  else visible=new Set(m.keys());
+  const rows=[];
+  if(isTree){
+    const vk=i=>(T.kids.get(i)||[]).filter(c=>visible.has(c));
+    const collapsed=(i,n)=>!q&&(st.col.has(i)||(n>12&&!st.exp.has(i)));
+    const emit=(i,d,guide)=>{const ks=vk(i).sort(cmp);rows.push([i,d,ks.length,collapsed(i,ks.length),guide]);
+      if(!collapsed(i,ks.length))ks.forEach((c,j)=>emit(c,d+1,guide+(j===ks.length-1?'└ ':'├ ')));};
+    T.roots.filter(i=>visible.has(i)).sort(cmp).forEach(i=>emit(i,0,''));
+  }else{
+    [...visible].filter(i=>!m.get(i).ghost&&(q?match(i):true)).sort(cmp).forEach(i=>rows.push([i,0,0,false,'']));
+  }
+  const LIMIT=1500,shown=rows.slice(0,LIMIT);
+  let h='<table class="pt"><thead><tr>'+cols.map(c=>`<th data-sort="${c.k}" class="${c.n?'num ':''}${c.k===sk?'on'+(st.asc?' asc':''):''}">${c.h}</th>`).join('')+'</tr></thead><tbody>';
+  for(const [i,d,nk,col,guide] of shown){
+    const o=m.get(i),p=P[i],s=T.sub.get(i);
+    const caret=isTree&&nk?`<span class="cr" data-tog="${i}">${col?'▸':'▾'}</span>`:'<span class="cr"></span>';
+    const g=isTree?`<span class="guide">${guide.slice(0,-2).replace(/├ /g,'│ ').replace(/└ /g,'  ')}${guide.slice(-2)}</span>`:'';
+    const kidsNote=isTree&&nk&&col?`<span class="sum">+${s.n-1}</span>`:'';
+    const cells=cols.map(c=>{
+      const showSum=isTree&&c.sub&&nk&&s;
+      switch(c.k){
+        case 'name':return `<td class="nm" title="${esc(p[5])}">${g}${caret}<b>${esc(p[6])}</b>${kidsNote}</td>`;
+        case 'pid':return `<td class="num">${p[0]}</td>`;
+        case 'user':return `<td>${esc(p[2].slice(0,10))}</td>`;
+        case 'cmd':return `<td class="cmd" title="${esc(p[5])}">${esc(p[5].slice(0,160))}</td>`;
+        case 'cpusec':return `<td class="num">${o.ghost?'':secs(o.cpusec)}${showSum&&s.cpusec>o.cpusec+0.5?`<span class="sum">Σ ${secs(s.cpusec)}</span>`:''}</td>`;
+        case 'cpu':return `<td class="num">${o.ghost?'':meter(o.cpu)+fr(o.cpu)}${st.mode==='snap'&&showSum&&s.cpu>o.cpu+0.5?`<span class="sum">Σ ${fr(s.cpu)}</span>`:''}</td>`;
+        case 'peak':return `<td class="num">${o.ghost?'':fr(o.peak,0)+' %'}</td>`;
+        case 'rss':return `<td class="num">${o.ghost?'':mb(o.rss)}${showSum&&s.rss>o.rss+1?`<span class="sum">Σ ${mb(s.rss)}</span>`:''}</td>`;
+        case 'rsspeak':return `<td class="num">${o.ghost?'':mb(o.rsspeak)}</td>`;
+        case 'mem':return `<td class="num">${o.ghost?'':fr(o.mem)}</td>`;
+        case 'th':return `<td class="num">${o.th||''}</td>`;
+        case 'state':return `<td class="st-${o.state}">${o.state||''}</td>`;
+        case 'start':return `<td class="num">${day(p[3])}</td>`;
+        case 'life':return `<td>${o.first?hm(o.first)+' → '+hm(o.last):''}</td>`;
+      }}).join('');
+    h+=`<tr class="r${st.sel===i?' sel':''}" data-row="${i}">${cells}</tr>`;
+    if(st.sel===i)h+=`<tr class="det"><td colspan="${cols.length}">${detail(i,m,T)}</td></tr>`;
+  }
+  h+='</tbody></table>';
+  if(rows.length>LIMIT)h+=`<p class="sub">… ${rows.length-LIMIT} lignes de plus : affine la recherche.</p>`;
+  root.querySelector('.px-wrap').innerHTML=h;const wrap=root.querySelector('.px-wrap');wrap.querySelectorAll('tr.det td>.det').forEach(d=>d.style.width=(wrap.clientWidth-28)+'px');
+  root.querySelector('.px-count').textContent=`${rows.length} process affichés sur ${m.size}`+(st.all||q?'':' (les plus significatifs)');
+  renderSnapHeader();
+}
+function spark(vals,fmt){
+  if(!vals.some(v=>v>0))return '<span class="dim">—</span>';
+  const W=300,H=46,mx=Math.max(...vals)||1,n=vals.length;
+  const pts=vals.map((v,j)=>`${(j/(Math.max(1,n-1))*W).toFixed(1)},${(H-3-(v/mx)*(H-6)).toFixed(1)}`).join(' ');
+  return `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><polygon points="0,${H} ${pts} ${W},${H}" fill="var(--s1)" opacity=".15"/><polyline points="${pts}" fill="none" stroke="var(--s1)" stroke-width="1.6" vector-effect="non-scaling-stroke"/></svg><span class="dim" style="font-size:11px">max ${fmt(mx)}</span>`;
+}
+function detail(i,m,T){
+  const p=P[i],o=m.get(i),s=T.sub.get(i);
+  const chain=[];let j=p[1];while(j>=0&&chain.length<12){chain.unshift(j);j=P[j][1]}
+  const chainH=chain.map(k=>`<a data-sel="${k}">${esc(P[k][6])} <span class="dim">${P[k][0]}</span></a>`).join(' → ')+(chain.length?' → ':'')+`<b>${esc(p[6])}</b>`;
+  const kids=(T.kids.get(i)||[]);
+  const kidsH=kids.slice().sort((a,b)=>(T.sub.get(b).cpusec+T.sub.get(b).cpu)-(T.sub.get(a).cpusec+T.sub.get(a).cpu)).slice(0,12)
+    .map(k=>`<a data-sel="${k}">${esc(P[k][6])} <span class="dim">${P[k][0]}</span></a>`).join(', ')+(kids.length>12?` … +${kids.length-12}`:'');
+  const cpuS=[],rssS=[];
+  for(const sn of S){const r=sn.rows.find(r=>r[0]===i);cpuS.push(r?r[1]:0);rssS.push(r?r[2]:0)}
+  const a=A[i];
+  return `<div class="det"><div class="k">Commande complète</div><code>${esc(p[5]||p[4])}</code>
+  <div class="det-grid">
+   <div><div class="k">Chaîne des parents</div>${chainH}</div>
+   <div><div class="k">Enfants (${kids.length})</div>${kidsH||'<span class="dim">aucun</span>'}</div>
+   <div><div class="k">Identité</div>PID ${p[0]} · ${esc(p[2])} · exécutable <b>${esc(p[4])}</b><br>démarré ${day(p[3])}</div>
+   <div><div class="k">Sur la période</div>${a?`temps CPU ${secs(a[0])} (Σ sous-arbre ${secs(s&&st.mode==='period'?s.cpusec:a[0])}) · pic ${fr(a[1],0)} % · RAM moy. ${mb(a[2])}, pic ${mb(a[3])} · vu de ${hm(a[5])} à ${hm(a[6])}`:'<span class="dim">pas de mesure propre (process parent)</span>'}</div>
+   <div><div class="k">CPU (% d'un cœur) au fil des instantanés</div>${spark(cpuS,v=>fr(v,0)+' %')}</div>
+   <div><div class="k">RAM au fil des instantanés</div>${spark(rssS,mb)}</div>
+  </div></div>`;
+}
+function renderSnapHeader(){
+  const box=root.querySelector('.px-snap');
+  if(st.mode!=='snap'||!S.length){box.style.display='none';return}
+  box.style.display='grid';
+  const s=S[st.snap];
+  box.querySelector('.px-when').textContent=day(s.t);
+  box.querySelector('input').value=st.snap;
+  const bar=(label,v,max,txt)=>`<div class="mm"><b>${label}</b><span class="track"><i style="width:${Math.min(100,v/max*100)}%;${v>max?'background:var(--s2)':''}"></i></span><span>${txt}</span></div>`;
+  box.querySelector('.px-meters').innerHTML=
+    bar('CPU',s.cpu,100,fr(s.cpu,0)+' %')+bar('Load',s.load,NC,fr(s.load)+' / '+NC)+
+    bar('Mém',s.mem,MT,mb(s.mem)+' / '+mb(MT))+bar('Swap',s.swap,Math.max(s.swap,1024),mb(s.swap))+
+    `<div class="mm"><b>Tâches</b><span>${s.np||'?'} process, ${s.nt||'?'} threads</span></div>`;
+}
+root.innerHTML=`<div class="px-bar">
+ <span class="seg"><button data-mode="period">Période</button><button data-mode="snap">Instantané</button></span>
+ <span class="seg"><button data-view="tree">Arbre</button><button data-view="list">Liste</button></span>
+ <input type="search" placeholder="Filtrer : nom, commande, PID, utilisateur…">
+ <label><input type="checkbox" class="px-all"> tout afficher</label><span class="px-count"></span></div>
+ <div class="px-snap"><button data-step="-1">◀</button><input type="range" min="0" max="${Math.max(0,S.length-1)}"><button data-step="1">▶</button>
+ <span class="px-when"></span><span></span><button data-peak="1">Pic de charge</button><div class="px-meters"></div></div>
+ <div class="px-wrap"></div>`;
+const syncBtns=()=>{root.querySelectorAll('[data-mode]').forEach(b=>b.classList.toggle('on',b.dataset.mode===st.mode));
+  root.querySelectorAll('[data-view]').forEach(b=>b.classList.toggle('on',b.dataset.view===st.view))};
+root.addEventListener('click',e=>{
+  const t=e.target.closest('[data-mode],[data-view],[data-sort],[data-tog],[data-sel],[data-step],[data-peak],[data-row]');if(!t)return;
+  const d=t.dataset;
+  if(d.mode){st.mode=d.mode;st.sel=-1}
+  else if(d.view)st.view=d.view;
+  else if(d.sort){if(st.sort[st.mode]===d.sort)st.asc=!st.asc;else{st.sort[st.mode]=d.sort;st.asc=['name','user','cmd','state'].includes(d.sort)}}
+  else if(d.tog!==undefined){e.stopPropagation();const i=+d.tog,n=st.col.has(i)||!st.exp.has(i);
+    const isCol=t.textContent==='▸';if(isCol){st.col.delete(i);st.exp.add(i)}else{st.col.add(i);st.exp.delete(i)}}
+  else if(d.sel!==undefined){st.sel=+d.sel;let j=P[st.sel][1];while(j>=0){st.col.delete(j);st.exp.add(j);j=P[j][1]}}
+  else if(d.step){st.snap=Math.max(0,Math.min(S.length-1,st.snap+ +d.step))}
+  else if(d.peak){st.snap=EX.peak}
+  else if(d.row!==undefined){const i=+d.row;st.sel=st.sel===i?-1:i}
+  syncBtns();render();
+});
+root.querySelector('input[type=search]').addEventListener('input',e=>{st.q=e.target.value;render()});
+root.querySelector('.px-all').addEventListener('change',e=>{st.all=e.target.checked;render()});
+root.querySelector('input[type=range]').addEventListener('input',e=>{st.snap=+e.target.value;render()});
+window.pickTime=t=>{if(!S.length)return;let b=0,bd=1e18;S.forEach((s,j)=>{const d=Math.abs(s.t-t);if(d<bd){bd=d;b=j}});
+  st.mode='snap';st.snap=b;st.sel=-1;syncBtns();render();document.getElementById('px-card').scrollIntoView({behavior:'smooth'})};
+syncBtns();render();
+})();
+'''
+
+
+def render_html(title, start, end, t, top_cpu, top_mem, peaks, dirs, day, prev_day, data, explorer=None):
     e = html.escape
     def when(ts, fmt="%d/%m %H:%M"):
         return dt.datetime.fromtimestamp(ts).strftime(fmt)
@@ -281,10 +674,11 @@ def render_html(title, start, end, t, top_cpu, top_mem, peaks, dirs, day, prev_d
     return f"""<!doctype html><html lang="fr"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>Charge machine — {e(title)}</title>
 <style>
-:root{{--page:#f9f9f7;--surface:#fcfcfb;--ink:#0b0b0b;--ink2:#52514e;--muted:#898781;--grid:#e1e0d9;--axis:#c3c2b7;
---s1:#2a78d6;--s2:#eb6834;--up:#d03b3b;--down:#006300;--warn:#fab219;--border:#e1e0d9}}
-@media (prefers-color-scheme:dark){{:root{{--page:#0d0d0d;--surface:#1a1a19;--ink:#f0efec;--ink2:#c3c2b7;--muted:#898781;
---grid:#2c2c2a;--axis:#383835;--s1:#3987e5;--s2:#d95926;--up:#e66767;--down:#0ca30c;--border:#2c2c2a}}}}
+/* Catppuccin : Latte (clair) / Macchiato (sombre) */
+:root{{--page:#e6e9ef;--surface:#eff1f5;--ink:#4c4f69;--ink2:#5c5f77;--muted:#6c6f85;--grid:#ccd0da;--axis:#bcc0cc;
+--s1:#1e66f5;--s2:#fe640b;--up:#d20f39;--down:#40a02b;--warn:#df8e1d;--border:#ccd0da;--on-s1:#eff1f5;color-scheme:light}}
+@media (prefers-color-scheme:dark){{:root{{--page:#1e2030;--surface:#24273a;--ink:#cad3f5;--ink2:#b8c0e0;--muted:#a5adcb;
+--grid:#363a4f;--axis:#494d64;--s1:#8aadf4;--s2:#f5a97f;--up:#ed8796;--down:#a6da95;--warn:#eed49f;--border:#363a4f;--on-s1:#181926;color-scheme:dark}}}}
 *{{box-sizing:border-box}}body{{margin:0;background:var(--page);color:var(--ink);font:14px/1.45 -apple-system,BlinkMacSystemFont,"Inter",sans-serif;font-variant-numeric:tabular-nums}}
 main{{max-width:1180px;margin:0 auto;padding:24px 16px 48px}}h1{{font-size:22px;margin:0 0 4px}}h2{{font-size:15px;margin:0 0 12px}}
 .sub{{color:var(--ink2);margin:0 0 20px}}.dim{{color:var(--muted)}}
@@ -302,6 +696,7 @@ table{{width:100%;border-collapse:collapse}}td,th{{padding:6px 8px;border-bottom
 th{{font-size:12px;color:var(--ink2);font-weight:500}}.num{{text-align:right;white-space:nowrap}}.path{{word-break:break-all}}
 .up{{color:var(--up)}}.down{{color:var(--down)}}code{{font-size:12px}}
 @media (max-width:560px){{.bar-row{{grid-template-columns:minmax(0,1fr) 90px}}.bar-track{{display:none}}}}
+{EXPLORER_CSS}
 </style></head><body><main>
 <h1>Charge machine — {e(title)}</h1>
 <p class="sub">{when(start)} → {when(end)} · {nS} échantillons (toutes les 5 min) · généré le {dt.datetime.now().strftime("%d/%m/%Y %H:%M")}</p>
@@ -322,6 +717,7 @@ th{{font-size:12px;color:var(--ink2);font-weight:500}}.num{{text-align:right;whi
 <div class="card"><h2>Process — CPU moyen (% d'un cœur)</h2>{cpu_bars}</div>
 <div class="card"><h2>Process — RAM moyenne</h2>{mem_bars}</div>
 </div>
+{EXPLORER_HTML if explorer else ""}
 <div class="card"><h2>Plus gros dossiers</h2><p class="sub" style="margin:-6px 0 8px">{dir_note}</p>
 <table><tr><th>Dossier</th><th class=num>Taille</th><th class=num>Évolution</th></tr>{dir_html}</table></div>
 <p class="sub" style="margin-top:16px">Les process sont regroupés par application (les helpers Chrome sous « Google Chrome ») ou par script pour Python/Node. Données : <code>{e(short_path(DB))}</code></p>
@@ -351,7 +747,8 @@ function chart(id,series,unit,yMaxMin,refLine){{
     xl.setAttribute('x1',xx);xl.setAttribute('x2',xx);xl.setAttribute('visibility','visible');
     for(const se of series){{const c=el.querySelector(`#${{id}}-${{se.k}}`);c.setAttribute('cx',xx);c.setAttribute('cy',y(p[se.k]));c.setAttribute('visibility','visible')}}
     tip.innerHTML=`<b>${{new Date(p.t*1000).toLocaleString('fr-FR',{{weekday:'short',hour:'2-digit',minute:'2-digit'}})}}</b><br>`+series.map(se=>`${{se.n}} : <b>${{p[se.k].toLocaleString('fr-FR')}} ${{unit}}</b>`).join('<br>');
-    tip.style.display='block';const px=xx*r.width/W;tip.style.left=Math.min(px+12,r.width-tip.offsetWidth)+'px';tip.style.top='8px'}});
+    tip.dataset.t=p.t;tip.style.display='block';const px=xx*r.width/W;tip.style.left=Math.min(px+12,r.width-tip.offsetWidth)+'px';tip.style.top='8px'}});
+  svg.style.cursor='pointer';svg.addEventListener('click',()=>{{if(window.pickTime&&tip.dataset.t)pickTime(+tip.dataset.t)}});
   svg.addEventListener('mouseleave',()=>{{tip.style.display='none';el.querySelectorAll('svg [visibility]').forEach(n=>n.setAttribute('visibility','hidden'))}});
 }}
 function draw(){{chart('c-cpu',[{{k:'cpu',n:'CPU',c:'--s1',fill:1}}],'%',100);
@@ -359,7 +756,10 @@ chart('c-load',[{{k:'load',n:'Load',c:'--s1',fill:1}}],'',{t["ncpu"]},{t["ncpu"]
 chart('c-mem',[{{k:'mem',n:'RAM',c:'--s1'}},{{k:'swap',n:'Swap',c:'--s2'}}],'Go',{nf(t["mem_total"], 0).replace(",", ".")});}}
 draw();let rt;addEventListener('resize',()=>{{clearTimeout(rt);rt=setTimeout(draw,150)}});
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change',draw);
-</script></body></html>"""
+</script>
+<script>const EX={json.dumps(explorer, separators=(",", ":"))};</script>
+<script>{EXPLORER_JS}</script>
+</body></html>"""
 
 
 def report(args):
