@@ -77,8 +77,6 @@ set -gx EDITOR nvim
 
 set -gx KUBE_CONFIG nvim
 
-set -gx ZK_NOTEBOOK_DIR "$HOME/.notes"
-
 set -gx _ZO_DATA_DIR "$HOME/.local/share/zoxide"
 
 # Zoxide interactive fzf options

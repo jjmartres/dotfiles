@@ -14,7 +14,6 @@ return {
         mode = { "n", "v" },
         ["g"] = { name = "+goto" },
         ["gs"] = { name = "+surround" },
-        ["z"] = { name = "+zettelkasten" },
         ["m"] = { name = "+fold" },
         ["]"] = { name = "+next" },
         ["["] = { name = "+prev" },
@@ -57,24 +56,6 @@ return {
         { "<leader>tf", desc = "Float Terminal", icon = { icon = "󱂬", color = "purple" } },
         { "<leader>th", desc = "Horizontal Terminal", icon = { icon = "󰤽", color = "blue" } },
         { "<leader>tv", desc = "Vertical Terminal", icon = { icon = "󰤼", color = "green" } },
-
-        { "<leader>z", group = "zettelkasten", icon = { icon = "󱓷", color = "azure" } },
-
-        { "<leader>zn", desc = "New note", icon = { icon = "󰈙", color = "green" } },
-        { "<leader>zp", desc = "New project", icon = { icon = "󰉋", color = "blue" } },
-        { "<leader>zi", desc = "New incident", icon = { icon = "󰀪", color = "red" } },
-        { "<leader>zd", desc = "Daily note", icon = { icon = "󰃭", color = "cyan" } },
-
-        { "<leader>zf", desc = "Find notes", icon = { icon = "󰈞", color = "yellow" } },
-        { "<leader>zt", desc = "Find by tags", icon = { icon = "󰓹", color = "orange" } },
-        { "<leader>zg", desc = "Grep notes", icon = { icon = "󰱼", color = "yellow" } },
-
-        { "<leader>zl", desc = "Insert link", icon = { icon = "󰌷", color = "purple" } },
-        { "<leader>zb", desc = "Backlinks", icon = { icon = "󰁍", color = "cyan" } },
-        { "<leader>zo", desc = "Outgoing links", icon = { icon = "󰁔", color = "cyan" } },
-
-        { "<leader>znt", desc = "Note from title", icon = { icon = "󰷈", color = "green" }, mode = "v" },
-        { "<leader>znc", desc = "Note from content", icon = { icon = "󰷉", color = "green" }, mode = "v" },
       })
 
       return opts

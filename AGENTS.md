@@ -20,7 +20,6 @@ dotfiles/
 ├── .pre-commit-config.yaml   # YAML lint, EOF, trailing-whitespace checks
 ├── fish/                     # Primary shell (functions/, conf.d/, completions/)
 ├── nvim/                     # Neovim — LazyVim-based
-├── zellij/                   # Terminal multiplexer + layouts
 ├── git/                      # Global gitconfig + template
 ├── starship/                 # Cross-shell prompt
 ├── atuin/                    # Shell history sync
@@ -91,7 +90,7 @@ update   # nvim plugins → Mason → CLT → asdf → brew bundle → brew upgr
 - **Always use Fish syntax** — no bashisms
 - **Forbidden**: `export`, `source`, `$()` subshells (use `(cmd)`), `[[`, `&&`/`||` (use `; and`/`; or`)
 - **Prompt**: Starship — theme driven by `$DEFAULT_THEME`
-- **Terminal**: Ghostty (primary); Zellij still configured but not the default session runner
+- **Terminal**: Ghostty
 - **Version manager**: asdf (`~/.asdf/shims`)
 
 ### Theme System
@@ -161,15 +160,6 @@ Completion files live in `fish/.config/fish/completions/<command>.fish`. Convent
 - Condition flags with `-n` guards using `contains -- <flag> (commandline -opc)`
 - Re-enable directory completion for path arguments with `complete -c <cmd> -F -n "..."`
 - Suppress conflicting flags from each other with mutual `-n` guards
-
-### Zellij — Layouts (KDL)
-
-- Layouts live in `zellij/.config/zellij/layouts/<name>.kdl`
-- `default.kdl` is the fallback when no session-specific layout exists
-- Session creation: try `<session>.kdl`, fall back to `default.kdl`; declare layout variable before the `if`, reassign inside (scoping rule above)
-- Tab name icons: use Nerd Font glyphs (`󱃾`, ``, `󰆦`, `` etc.)
-- Suspended tabs: use `start_suspended=true` for heavy processes (k9s, nibbler)
-- Plain terminal tab: `tab name="  terminal" { pane }`
 
 ### Neovim Plugins
 

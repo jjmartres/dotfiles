@@ -21,7 +21,7 @@ LazyVim-based configuration. Each file in this directory is auto-loaded by Lazy.
 |--------|------|-------------|
 | `folke/snacks.nvim` | `ui.lua` | Dashboard with git status and MR summary on startup, zen mode, floating terminal (`<C-/>`), Snacks picker, and Oil file rename hook. |
 | `nvim-lualine/lualine.nvim` | `statusline.lua` | Status line. Replaces the right-most section with a live clock. |
-| `folke/which-key.nvim` | `keymaps.lua` | Keymap popup with group labels and Nerd Font icons for `+git`, `+terminal`, `+zettelkasten`, and more. |
+| `folke/which-key.nvim` | `keymaps.lua` | Keymap popup with group labels and Nerd Font icons for `+git`, `+terminal`, and more. |
 | `f-person/auto-dark-mode.nvim` | `theme.lua` | Polls macOS every 5s and switches between `catppuccin-macchiato` (dark) and `catppuccin-latte` (light) automatically. |
 | `folke/zen-mode.nvim` | `focus.lua` | Centres the buffer at 120 columns, hides line numbers and sign column, enables Twilight. `<leader>m`. |
 | `MeanderingProgrammer/render-markdown.nvim` | `markdown.lua` | Renders Markdown headings, code blocks, and lists visually inside the buffer. Toggle with `<leader>um`. |
@@ -95,15 +95,6 @@ LazyVim-based configuration. Each file in this directory is auto-loaded by Lazy.
 
 ---
 
-## Notes & Zettelkasten
-
-| Plugin | File | Description |
-|--------|------|-------------|
-| `zk-org/zk-nvim` | `notes.lua` | Full Zettelkasten workflow backed by the `zk` CLI and `~/.notes`. Create notes by title, group, or daily; search by content or tag; insert and navigate wiki-style links. `<Enter>` follows links, `<Backspace>` goes back. |
-| `okuuva/auto-save.nvim` | `autosave.lua` | Autosaves only `working-sessions` Markdown files inside `$ZK_NOTEBOOK_DIR`. Everything else is untouched. |
-
----
-
 ## Terminal
 
 | Plugin | File | Description |
@@ -134,4 +125,3 @@ LazyVim-based configuration. Each file in this directory is auto-loaded by Lazy.
 | Variable | Used by | Description |
 |----------|---------|-------------|
 | `NVIM_PROJECTS_FILE` | `projects.lua` | Path to the project list file (one absolute path per line). Written by the `code` Fish function as `$CODE_CACHE_DIR/$CODE_DEFAULT_SESSION.nvim`. |
-| `ZK_NOTEBOOK_DIR` | `autosave.lua` | Root of the Zettelkasten notebook. Autosave is scoped to `working-sessions` files within it. |
