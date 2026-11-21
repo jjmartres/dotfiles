@@ -59,6 +59,10 @@ def db():
     CREATE INDEX IF NOT EXISTS psamp_ts ON psamp(ts);
     CREATE TABLE IF NOT EXISTS cpu_last(pkey TEXT PRIMARY KEY, cputime REAL, ts INTEGER);
     CREATE TABLE IF NOT EXISTS sysextra(ts INTEGER PRIMARY KEY, nprocs INTEGER, nthreads INTEGER);
+    CREATE TABLE IF NOT EXISTS power(ts INTEGER PRIMARY KEY, bat_pct INTEGER, charging INTEGER, plugged INTEGER,
+      bat_temp REAL, bat_volt REAL, bat_amp REAL, bat_w REAL, cycles INTEGER, health REAL, raw_max INTEGER,
+      design INTEGER, adapter_w INTEGER, cpu_temp REAL, gpu_temp REAL, fan_rpm INTEGER, fan_max INTEGER,
+      sys_w REAL, cpu_w REAL, gpu_w REAL);
     """)
     return c
 
@@ -162,6 +166,51 @@ def snapshot_tree(c, ts):
     c.execute("DELETE FROM sysextra WHERE ts < ?", (cutoff,))
 
 
+def power_sample():
+    """Batterie (ioreg, sans sudo) + températures / ventilateurs / puissance (macmon, si installé)."""
+    r = {}
+    bat = sh(["ioreg", "-rn", "AppleSmartBattery"], timeout=10)
+    def iv(key):
+        m = re.search(r'"%s" = (-?\d+)' % key, bat)
+        if not m:
+            return None
+        v = int(m.group(1))
+        return v - (1 << 64) if v >= 1 << 63 else v  # courant négatif affiché en non signé
+    def yes(key):
+        m = re.search(r'"%s" = (Yes|No)' % key, bat)
+        return None if not m else int(m.group(1) == "Yes")
+    if bat:
+        volt, amp = iv("Voltage"), iv("Amperage")
+        raw_max, design = iv("AppleRawMaxCapacity"), iv("DesignCapacity")
+        t = iv("Temperature")
+        m = re.search(r'"AdapterDetails" = \{[^}]*"Watts"=(\d+)', bat)
+        r.update(bat_pct=iv("CurrentCapacity"), charging=yes("IsCharging"), plugged=yes("ExternalConnected"),
+                 bat_temp=t / 100 if t is not None else None, bat_volt=volt / 1000 if volt else None,
+                 bat_amp=amp / 1000 if amp is not None else None,
+                 bat_w=round(volt * amp / 1e6, 2) if volt and amp is not None else None,
+                 cycles=iv("CycleCount"), raw_max=raw_max, design=design,
+                 health=round(raw_max / design * 100, 1) if raw_max and design else None,
+                 adapter_w=int(m.group(1)) if m and yes("ExternalConnected") else None)
+    macmon = shutil.which("macmon") or next((x for x in ("/opt/homebrew/bin/macmon", "/usr/local/bin/macmon") if os.path.exists(x)), None)
+    if macmon:
+        line = sh([macmon, "pipe", "-s", "1", "-i", "500"], timeout=15).strip().splitlines()
+        try:
+            d = json.loads(line[0]) if line else {}
+        except ValueError:
+            d = {}
+        temp = d.get("temp") or {}
+        fans = d.get("fans") or []
+        r.update(cpu_temp=temp.get("cpu_temp_avg"), gpu_temp=temp.get("gpu_temp_avg"),
+                 fan_rpm=max((f.get("rpm", 0) for f in fans), default=None),
+                 fan_max=max((f.get("max_rpm", 0) for f in fans), default=None),
+                 sys_w=d.get("sys_power"), cpu_w=d.get("cpu_power"), gpu_w=d.get("gpu_power"))
+    return r
+
+
+POWER_COLS = ["bat_pct", "charging", "plugged", "bat_temp", "bat_volt", "bat_amp", "bat_w", "cycles", "health",
+              "raw_max", "design", "adapter_w", "cpu_temp", "gpu_temp", "fan_rpm", "fan_max", "sys_w", "cpu_w", "gpu_w"]
+
+
 def collect():
     ts = int(time.time())
     load1, load5, load15 = os.getloadavg()
@@ -212,6 +261,10 @@ def collect():
         c.executemany("INSERT INTO procs VALUES(?,?,?,?,?)",
                       [(ts, k, round(v[0], 1), v[1], v[2]) for k, v in keep.items()])
         snapshot_tree(c, ts)
+        pw = power_sample()
+        if pw:
+            c.execute("INSERT OR REPLACE INTO power VALUES(?%s)" % (",?" * len(POWER_COLS)),
+                      [ts] + [pw.get(k) for k in POWER_COLS])
         cutoff = ts - RETENTION_DAYS * 86400
         c.execute("DELETE FROM samples WHERE ts < ?", (cutoff,))
         c.execute("DELETE FROM procs WHERE ts < ?", (cutoff,))
@@ -276,6 +329,38 @@ def build_report(start, end, title, out_path):
         cpu = [(r[2] or 0) + (r[3] or 0) for r in ch]
         pts.append({"t": ch[0][0], "cpu": round(sum(cpu) / len(ch), 1), "load": round(max(r[1] for r in ch), 2),
                     "mem": round(gb(sum(r[6] for r in ch) / len(ch)), 2), "swap": round(gb(max(r[7] for r in ch)), 2)})
+    # énergie et températures, alignées sur les mêmes points
+    PW = {r[0]: dict(zip(POWER_COLS, r[1:])) for r in c.execute(
+        "SELECT ts,%s FROM power WHERE ts>=? AND ts<?" % ",".join(POWER_COLS), (start, end))}
+    def pmean(chunk, k, agg="avg", nd=1):
+        v = [PW[r[0]][k] for r in chunk if r[0] in PW and PW[r[0]][k] is not None]
+        if not v:
+            return None
+        return round(max(v) if agg == "max" else sum(v) / len(v), nd)
+    for i, pt in enumerate(pts):
+        ch = S[i * step:i * step + step]
+        pt.update(bat=pmean(ch, "bat_pct", nd=0), plug=pmean(ch, "plugged", "max", 0),
+                  ctemp=pmean(ch, "cpu_temp"), gtemp=pmean(ch, "gpu_temp"), btemp=pmean(ch, "bat_temp"),
+                  fan=pmean(ch, "fan_rpm", "max", 0), sysw=pmean(ch, "sys_w"), cpuw=pmean(ch, "cpu_w"),
+                  gpuw=pmean(ch, "gpu_w"), batw=pmean(ch, "bat_w"))
+    power = None
+    if PW:
+        rows = [PW[k] for k in sorted(PW)]
+        def col(k):
+            return [r[k] for r in rows if r[k] is not None]
+        def avg(v):
+            return sum(v) / len(v) if v else None
+        last = rows[-1]
+        power = {"bat_last": last["bat_pct"], "bat_min": min(col("bat_pct"), default=None), "bat_max": max(col("bat_pct"), default=None),
+                 "plugged_pct": avg([r["plugged"] for r in rows if r["plugged"] is not None]),
+                 "health": last["health"], "cycles": last["cycles"], "raw_max": last["raw_max"], "design": last["design"],
+                 "bat_temp_max": max(col("bat_temp"), default=None),
+                 "cpu_temp_avg": avg(col("cpu_temp")), "cpu_temp_max": max(col("cpu_temp"), default=None),
+                 "gpu_temp_max": max(col("gpu_temp"), default=None),
+                 "fan_max": max(col("fan_rpm"), default=None), "fan_limit": max(col("fan_max"), default=None),
+                 "sys_w_avg": avg(col("sys_w")), "sys_w_max": max(col("sys_w"), default=None),
+                 "cpu_w_avg": avg(col("cpu_w")), "gpu_w_avg": avg(col("gpu_w")),
+                 "has_bat": bool(col("bat_pct")), "has_temp": bool(col("cpu_temp")), "has_fan": bool(col("fan_rpm"))}
     cpu_all = [(r[2] or 0) + (r[3] or 0) for r in S]
     mem_total = S[-1][5]
     tiles = {
@@ -322,7 +407,7 @@ def build_report(start, end, title, out_path):
 
     data = {"points": pts, "range_days": (end - start) / 86400}
     explorer = explorer_data(start, end, S, ncpu, mem_total)
-    html_text = render_html(title, start, end, tiles, top_cpu, top_mem, peak_rows, dirs, day, prev_day, data, explorer)
+    html_text = render_html(title, start, end, tiles, top_cpu, top_mem, peak_rows, dirs, day, prev_day, data, explorer, power)
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     with open(out_path, "w") as f:
         f.write(html_text)
@@ -639,7 +724,45 @@ syncBtns();render();
 '''
 
 
-def render_html(title, start, end, t, top_cpu, top_mem, peaks, dirs, day, prev_day, data, explorer=None):
+def power_html(pw):
+    if not pw:
+        return ""
+    def v(x, d=0, unit=""):
+        return "—" if x is None else f"{nf(x, d)}{unit}"
+    tiles = []
+    if pw["has_bat"]:
+        tiles.append(f'<div class="card tile"><div class="k">Batterie</div><div class="v">{v(pw["bat_last"], 0, " %")}</div>'
+                     f'<div class="d">min {v(pw["bat_min"], 0, " %")} · sur secteur {v((pw["plugged_pct"] or 0) * 100, 0, " %")} du temps</div></div>')
+        tiles.append(f'<div class="card tile"><div class="k">Santé batterie</div><div class="v">{v(pw["health"], 0, " %")}</div>'
+                     f'<div class="d">{v(pw["cycles"])} cycles · {v(pw["raw_max"])} / {v(pw["design"])} mAh</div></div>')
+    if pw["has_temp"]:
+        tiles.append(f'<div class="card tile"><div class="k">Température CPU</div><div class="v">{v(pw["cpu_temp_avg"], 0, " °C")}</div>'
+                     f'<div class="d">pic {v(pw["cpu_temp_max"], 0, " °C")} · GPU pic {v(pw["gpu_temp_max"], 0, " °C")}</div></div>')
+    if pw["bat_temp_max"] is not None:
+        tiles.append(f'<div class="card tile"><div class="k">Température batterie max</div><div class="v">{v(pw["bat_temp_max"], 1, " °C")}</div>'
+                     f'<div class="d">au-delà de 35 °C, la batterie s\'use plus vite</div></div>')
+    if pw["sys_w_avg"] is not None:
+        tiles.append(f'<div class="card tile"><div class="k">Consommation moy.</div><div class="v">{v(pw["sys_w_avg"], 1, " W")}</div>'
+                     f'<div class="d">pic {v(pw["sys_w_max"], 0, " W")} · CPU {v(pw["cpu_w_avg"], 1, " W")} · GPU {v(pw["gpu_w_avg"], 1, " W")}</div></div>')
+    if pw["has_fan"]:
+        tiles.append(f'<div class="card tile"><div class="k">Ventilateurs max</div><div class="v">{v(pw["fan_max"])} tr/min</div>'
+                     f'<div class="d">limite {v(pw["fan_limit"])} tr/min</div></div>')
+    leg = lambda items: '<div class="legend">' + "".join(f'<span><i style="background:var({c})"></i>{n}</span>' for c, n in items) + "</div>"
+    charts = []
+    if pw["has_bat"]:
+        charts.append('<div class="card"><h2>Batterie (%)</h2>' + leg([("--s1", "Charge"), ("--band", "Sur secteur")]) + '<div class="chart" id="c-bat"></div></div>')
+    if pw["has_temp"] or pw["bat_temp_max"] is not None:
+        items = ([("--s1", "CPU"), ("--s2", "GPU")] if pw["has_temp"] else []) + ([("--s3", "Batterie")] if pw["bat_temp_max"] is not None else [])
+        charts.append('<div class="card"><h2>Températures (°C)</h2>' + leg(items) + '<div class="chart" id="c-temp"></div></div>')
+    if pw["sys_w_avg"] is not None:
+        charts.append('<div class="card"><h2>Puissance (W)</h2>' + leg([("--s1", "Système"), ("--s2", "CPU"), ("--s3", "GPU")]) + '<div class="chart" id="c-pow"></div></div>')
+    if pw["has_fan"]:
+        charts.append('<div class="card"><h2>Ventilateurs (tr/min, le plus rapide)</h2><div class="chart" id="c-fan"></div></div>')
+    return ('<section id="power"><h2 style="font-size:17px;margin:24px 0 12px">Énergie et températures</h2>'
+            f'<div class="tiles">{"".join(tiles)}</div><div class="grid2">{"".join(charts)}</div></section>')
+
+
+def render_html(title, start, end, t, top_cpu, top_mem, peaks, dirs, day, prev_day, data, explorer=None, power=None):
     e = html.escape
     def when(ts, fmt="%d/%m %H:%M"):
         return dt.datetime.fromtimestamp(ts).strftime(fmt)
@@ -676,9 +799,9 @@ def render_html(title, start, end, t, top_cpu, top_mem, peaks, dirs, day, prev_d
 <style>
 /* Catppuccin : Latte (clair) / Macchiato (sombre) */
 :root{{--page:#e6e9ef;--surface:#eff1f5;--ink:#4c4f69;--ink2:#5c5f77;--muted:#6c6f85;--grid:#ccd0da;--axis:#bcc0cc;
---s1:#1e66f5;--s2:#fe640b;--up:#d20f39;--down:#40a02b;--warn:#df8e1d;--border:#ccd0da;--on-s1:#eff1f5;color-scheme:light}}
+--s1:#1e66f5;--s2:#fe640b;--s3:#8839ef;--band:#40a02b33;--up:#d20f39;--down:#40a02b;--warn:#df8e1d;--border:#ccd0da;--on-s1:#eff1f5;color-scheme:light}}
 @media (prefers-color-scheme:dark){{:root{{--page:#1e2030;--surface:#24273a;--ink:#cad3f5;--ink2:#b8c0e0;--muted:#a5adcb;
---grid:#363a4f;--axis:#494d64;--s1:#8aadf4;--s2:#f5a97f;--up:#ed8796;--down:#a6da95;--warn:#eed49f;--border:#363a4f;--on-s1:#181926;color-scheme:dark}}}}
+--grid:#363a4f;--axis:#494d64;--s1:#8aadf4;--s2:#f5a97f;--s3:#c6a0f6;--band:#a6da9533;--up:#ed8796;--down:#a6da95;--warn:#eed49f;--border:#363a4f;--on-s1:#181926;color-scheme:dark}}}}
 *{{box-sizing:border-box}}body{{margin:0;background:var(--page);color:var(--ink);font:14px/1.45 -apple-system,BlinkMacSystemFont,"Inter",sans-serif;font-variant-numeric:tabular-nums}}
 main{{max-width:1180px;margin:0 auto;padding:24px 16px 48px}}h1{{font-size:22px;margin:0 0 4px}}h2{{font-size:15px;margin:0 0 12px}}
 .sub{{color:var(--ink2);margin:0 0 20px}}.dim{{color:var(--muted)}}
@@ -713,6 +836,7 @@ th{{font-size:12px;color:var(--ink2);font-weight:500}}.num{{text-align:right;whi
 <div class="card"><h2>Mémoire (Go)</h2><div class="legend"><span><i style="background:var(--s1)"></i>RAM utilisée</span><span><i style="background:var(--s2)"></i>Swap</span></div><div class="chart" id="c-mem"></div></div>
 <div class="card"><h2>Moments les plus chargés</h2><table><tr><th>Quand</th><th class=num>Load</th><th class=num>CPU</th><th>Process en tête</th></tr>{peak_html}</table></div>
 </div>
+{power_html(power)}
 <div class="grid2">
 <div class="card"><h2>Process — CPU moyen (% d'un cœur)</h2>{cpu_bars}</div>
 <div class="card"><h2>Process — RAM moyenne</h2>{mem_bars}</div>
@@ -726,18 +850,21 @@ th{{font-size:12px;color:var(--ink2);font-weight:500}}.num{{text-align:right;whi
 const D={json.dumps(data)};
 const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const fmtT=t=>{{const d=new Date(t*1000);return D.range_days>1.5?d.toLocaleDateString('fr-FR',{{day:'2-digit',month:'2-digit'}})+' '+d.toLocaleTimeString('fr-FR',{{hour:'2-digit',minute:'2-digit'}}):d.toLocaleTimeString('fr-FR',{{hour:'2-digit',minute:'2-digit'}})}};
-function chart(id,series,unit,yMaxMin,refLine){{
+function chart(id,series,unit,yMaxMin,refLine,band){{
   const el=document.getElementById(id),P=D.points;if(!P.length)return;
   const W=Math.max(320,el.clientWidth),H=220,L=40,R=10,T=10,B=24,NS='http://www.w3.org/2000/svg';
-  let raw=Math.max(yMaxMin,...series.flatMap(s=>P.map(p=>p[s.k])),refLine||0)*1.05,st=Math.pow(10,Math.floor(Math.log10(raw/4)));st=[1,2,2.5,5,10].map(m=>m*st).find(v=>v*4>=raw);let ymax=st*4;
+  let raw=Math.max(yMaxMin,...series.flatMap(s=>P.map(p=>p[s.k]??0)),refLine||0)*1.05,st=Math.pow(10,Math.floor(Math.log10(raw/4)));st=[1,2,2.5,5,10].map(m=>m*st).find(v=>v*4>=raw);let ymax=st*4;if(unit==='%'&&raw<=105)ymax=100;
   const t0=P[0].t,t1=P[P.length-1].t||t0+1,x=t=>L+(W-L-R)*(t-t0)/Math.max(1,t1-t0),y=v=>T+(H-T-B)*(1-v/ymax);
   let s=`<svg xmlns="${{NS}}" viewBox="0 0 ${{W}} ${{H}}" style="height:${{H}}px">`;
   for(let i=0;i<=4;i++){{const v=ymax*i/4,yy=y(v);s+=`<line x1="${{L}}" x2="${{W-R}}" y1="${{yy}}" y2="${{yy}}" stroke="${{css(i?'--grid':'--axis')}}"/><text x="${{L-6}}" y="${{yy+4}}" text-anchor="end" font-size="11" fill="${{css('--muted')}}">${{v.toFixed(ymax<10?1:0)}}</text>`}}
   const nt=Math.min(6,P.length);for(let i=0;i<nt;i++){{const t=t0+(t1-t0)*i/Math.max(1,nt-1);s+=`<text x="${{x(t)}}" y="${{H-6}}" text-anchor="${{i==0?'start':i==nt-1?'end':'middle'}}" font-size="11" fill="${{css('--muted')}}">${{fmtT(t)}}</text>`}}
+  if(band){{let b0=null;P.forEach((p,j)=>{{const on=p[band]===1;if(on&&b0===null)b0=p.t;
+    if(b0!==null&&(!on||j===P.length-1)){{const b1=on?p.t:p.t;s+=`<rect x="${{x(b0)}}" y="${{T}}" width="${{Math.max(2,x(b1)-x(b0))}}" height="${{H-T-B}}" fill="${{css('--band')}}"/>`;b0=null}}}})}}
   if(refLine)s+=`<line x1="${{L}}" x2="${{W-R}}" y1="${{y(refLine)}}" y2="${{y(refLine)}}" stroke="${{css('--warn')}}" stroke-dasharray="4 4"/>`;
-  for(const se of series){{const pts=P.map(p=>`${{x(p.t).toFixed(1)}},${{y(p[se.k]).toFixed(1)}}`).join(' ');
-    if(se.fill)s+=`<polygon points="${{x(t0)}},${{y(0)}} ${{pts}} ${{x(t1)}},${{y(0)}}" fill="${{css(se.c)}}" opacity=".14"/>`;
-    s+=`<polyline points="${{pts}}" fill="none" stroke="${{css(se.c)}}" stroke-width="2" stroke-linejoin="round"/>`}}
+  for(const se of series){{const segs=[[]];P.forEach(p=>{{if(p[se.k]==null){{if(segs[segs.length-1].length)segs.push([])}}else segs[segs.length-1].push(p)}});
+    for(const g of segs){{if(!g.length)continue;const pts=g.map(p=>`${{x(p.t).toFixed(1)}},${{y(p[se.k]).toFixed(1)}}`).join(' ');
+    if(se.fill)s+=`<polygon points="${{x(g[0].t)}},${{y(0)}} ${{pts}} ${{x(g[g.length-1].t)}},${{y(0)}}" fill="${{css(se.c)}}" opacity=".14"/>`;
+    s+=`<polyline points="${{pts}}" fill="none" stroke="${{css(se.c)}}" stroke-width="2" stroke-linejoin="round"/>`}}}}
   s+=`<line id="${{id}}-x" y1="${{T}}" y2="${{H-B}}" stroke="${{css('--axis')}}" visibility="hidden"/>`;
   for(const se of series)s+=`<circle id="${{id}}-${{se.k}}" r="4" fill="${{css(se.c)}}" stroke="${{css('--surface')}}" stroke-width="2" visibility="hidden"/>`;
   el.innerHTML=s+'</svg><div class="tip"></div>';
@@ -745,15 +872,20 @@ function chart(id,series,unit,yMaxMin,refLine){{
   svg.addEventListener('mousemove',ev=>{{const r=svg.getBoundingClientRect(),mx=(ev.clientX-r.left)*W/r.width;
     let i=0,bd=1e18;P.forEach((p,j)=>{{const d=Math.abs(x(p.t)-mx);if(d<bd){{bd=d;i=j}}}});const p=P[i],xx=x(p.t);
     xl.setAttribute('x1',xx);xl.setAttribute('x2',xx);xl.setAttribute('visibility','visible');
-    for(const se of series){{const c=el.querySelector(`#${{id}}-${{se.k}}`);c.setAttribute('cx',xx);c.setAttribute('cy',y(p[se.k]));c.setAttribute('visibility','visible')}}
-    tip.innerHTML=`<b>${{new Date(p.t*1000).toLocaleString('fr-FR',{{weekday:'short',hour:'2-digit',minute:'2-digit'}})}}</b><br>`+series.map(se=>`${{se.n}} : <b>${{p[se.k].toLocaleString('fr-FR')}} ${{unit}}</b>`).join('<br>');
+    for(const se of series){{const c=el.querySelector(`#${{id}}-${{se.k}}`);if(p[se.k]==null){{c.setAttribute('visibility','hidden');continue}}c.setAttribute('cx',xx);c.setAttribute('cy',y(p[se.k]));c.setAttribute('visibility','visible')}}
+    tip.innerHTML=`<b>${{new Date(p.t*1000).toLocaleString('fr-FR',{{weekday:'short',hour:'2-digit',minute:'2-digit'}})}}</b><br>`+series.filter(se=>p[se.k]!=null).map(se=>`${{se.n}} : <b>${{p[se.k].toLocaleString('fr-FR')}} ${{unit}}</b>`).join('<br>')+(band&&p[band]===1?'<br><span style="color:var(--muted)">sur secteur</span>':'');
     tip.dataset.t=p.t;tip.style.display='block';const px=xx*r.width/W;tip.style.left=Math.min(px+12,r.width-tip.offsetWidth)+'px';tip.style.top='8px'}});
   svg.style.cursor='pointer';svg.addEventListener('click',()=>{{if(window.pickTime&&tip.dataset.t)pickTime(+tip.dataset.t)}});
   svg.addEventListener('mouseleave',()=>{{tip.style.display='none';el.querySelectorAll('svg [visibility]').forEach(n=>n.setAttribute('visibility','hidden'))}});
 }}
 function draw(){{chart('c-cpu',[{{k:'cpu',n:'CPU',c:'--s1',fill:1}}],'%',100);
 chart('c-load',[{{k:'load',n:'Load',c:'--s1',fill:1}}],'',{t["ncpu"]},{t["ncpu"]});
-chart('c-mem',[{{k:'mem',n:'RAM',c:'--s1'}},{{k:'swap',n:'Swap',c:'--s2'}}],'Go',{nf(t["mem_total"], 0).replace(",", ".")});}}
+chart('c-mem',[{{k:'mem',n:'RAM',c:'--s1'}},{{k:'swap',n:'Swap',c:'--s2'}}],'Go',{nf(t["mem_total"], 0).replace(",", ".")});
+const has=id=>document.getElementById(id);
+if(has('c-bat'))chart('c-bat',[{{k:'bat',n:'Charge',c:'--s1',fill:1}}],'%',100,0,'plug');
+if(has('c-temp'))chart('c-temp',[{{k:'ctemp',n:'CPU',c:'--s1'}},{{k:'gtemp',n:'GPU',c:'--s2'}},{{k:'btemp',n:'Batterie',c:'--s3'}}],'°C',50);
+if(has('c-pow'))chart('c-pow',[{{k:'sysw',n:'Système',c:'--s1',fill:1}},{{k:'cpuw',n:'CPU',c:'--s2'}},{{k:'gpuw',n:'GPU',c:'--s3'}}],'W',10);
+if(has('c-fan'))chart('c-fan',[{{k:'fan',n:'Ventilateur',c:'--s1',fill:1}}],'tr/min',1000);}}
 draw();let rt;addEventListener('resize',()=>{{clearTimeout(rt);rt=setTimeout(draw,150)}});
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change',draw);
 </script>
