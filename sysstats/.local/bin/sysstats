@@ -795,13 +795,19 @@ def render_html(title, start, end, t, top_cpu, top_mem, peaks, dirs, day, prev_d
     sat = t["load_max"] / t["ncpu"]
     disk_pct = 100 * t["disk_used"] / t["disk_total"]
     return f"""<!doctype html><html lang="fr"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1"><title>Charge machine — {e(title)}</title>
+<meta name="viewport" content="width=device-width,initial-scale=1"><script>try{{const t=localStorage.getItem('sysstats-theme');if(t==='light'||t==='dark')document.documentElement.dataset.theme=t}}catch(e){{}}</script><title>Charge machine — {e(title)}</title>
 <style>
 /* Catppuccin : Latte (clair) / Macchiato (sombre) */
 :root{{--page:#e6e9ef;--surface:#eff1f5;--ink:#4c4f69;--ink2:#5c5f77;--muted:#6c6f85;--grid:#ccd0da;--axis:#bcc0cc;
 --s1:#1e66f5;--s2:#fe640b;--s3:#8839ef;--band:#40a02b33;--up:#d20f39;--down:#40a02b;--warn:#df8e1d;--border:#ccd0da;--on-s1:#eff1f5;color-scheme:light}}
-@media (prefers-color-scheme:dark){{:root{{--page:#1e2030;--surface:#24273a;--ink:#cad3f5;--ink2:#b8c0e0;--muted:#a5adcb;
+@media (prefers-color-scheme:dark){{:root:not([data-theme=light]){{--page:#1e2030;--surface:#24273a;--ink:#cad3f5;--ink2:#b8c0e0;--muted:#a5adcb;
 --grid:#363a4f;--axis:#494d64;--s1:#8aadf4;--s2:#f5a97f;--s3:#c6a0f6;--band:#a6da9533;--up:#ed8796;--down:#a6da95;--warn:#eed49f;--border:#363a4f;--on-s1:#181926;color-scheme:dark}}}}
+:root[data-theme=dark]{{--page:#1e2030;--surface:#24273a;--ink:#cad3f5;--ink2:#b8c0e0;--muted:#a5adcb;
+--grid:#363a4f;--axis:#494d64;--s1:#8aadf4;--s2:#f5a97f;--s3:#c6a0f6;--band:#a6da9533;--up:#ed8796;--down:#a6da95;--warn:#eed49f;--border:#363a4f;--on-s1:#181926;color-scheme:dark}}
+.themesw{{display:inline-flex;border:1px solid var(--axis);border-radius:7px;overflow:hidden;flex:none}}
+.themesw button{{border:0;background:transparent;color:var(--ink2);padding:5px 10px;font:inherit;font-size:12px;cursor:pointer}}
+.themesw button.on{{background:var(--s1);color:var(--on-s1)}}
+.head{{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}}
 *{{box-sizing:border-box}}body{{margin:0;background:var(--page);color:var(--ink);font:14px/1.45 -apple-system,BlinkMacSystemFont,"Inter",sans-serif;font-variant-numeric:tabular-nums}}
 main{{max-width:1180px;margin:0 auto;padding:24px 16px 48px}}h1{{font-size:22px;margin:0 0 4px}}h2{{font-size:15px;margin:0 0 12px}}
 .sub{{color:var(--ink2);margin:0 0 20px}}.dim{{color:var(--muted)}}
@@ -821,7 +827,7 @@ th{{font-size:12px;color:var(--ink2);font-weight:500}}.num{{text-align:right;whi
 @media (max-width:560px){{.bar-row{{grid-template-columns:minmax(0,1fr) 90px}}.bar-track{{display:none}}}}
 {EXPLORER_CSS}
 </style></head><body><main>
-<h1>Charge machine — {e(title)}</h1>
+<div class="head"><h1>Charge machine — {e(title)}</h1><span class="themesw" role="group" aria-label="Thème"><button data-theme-set="auto">Auto</button><button data-theme-set="light">Clair</button><button data-theme-set="dark">Sombre</button></span></div>
 <p class="sub">{when(start)} → {when(end)} · {nS} échantillons (toutes les 5 min) · généré le {dt.datetime.now().strftime("%d/%m/%Y %H:%M")}</p>
 <div class="tiles">
 <div class="card tile"><div class="k">CPU moyen</div><div class="v">{nf(t["cpu_avg"], 0)} %</div><div class="d">pic {nf(t["cpu_max"], 0)} %</div></div>
@@ -888,6 +894,11 @@ if(has('c-pow'))chart('c-pow',[{{k:'sysw',n:'Système',c:'--s1',fill:1}},{{k:'cp
 if(has('c-fan'))chart('c-fan',[{{k:'fan',n:'Ventilateur',c:'--s1',fill:1}}],'tr/min',1000);}}
 draw();let rt;addEventListener('resize',()=>{{clearTimeout(rt);rt=setTimeout(draw,150)}});
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change',draw);
+function setTheme(t){{const r=document.documentElement;if(t==='auto')delete r.dataset.theme;else r.dataset.theme=t;
+  try{{t==='auto'?localStorage.removeItem('sysstats-theme'):localStorage.setItem('sysstats-theme',t)}}catch(e){{}}
+  document.querySelectorAll('[data-theme-set]').forEach(b=>b.classList.toggle('on',b.dataset.themeSet===t));draw()}}
+document.querySelectorAll('[data-theme-set]').forEach(b=>b.addEventListener('click',()=>setTheme(b.dataset.themeSet)));
+document.querySelectorAll('[data-theme-set]').forEach(b=>b.classList.toggle('on',b.dataset.themeSet===(document.documentElement.dataset.theme||'auto')));
 </script>
 <script>const EX={json.dumps(explorer, separators=(",", ":"))};</script>
 <script>{EXPLORER_JS}</script>
