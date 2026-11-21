@@ -1,0 +1,537 @@
+#!/usr/bin/python3
+"""sysstats — historique local CPU / RAM / disque / process / dossiers, rapports HTML.
+
+  sysstats collect              échantillon (launchd, toutes les 5 min)
+  sysstats du                   scan des plus gros dossiers (launchd, 1x/jour)
+  sysstats daily                du + rapport du jour (launchd, 23:55)
+  sysstats report [--date AAAA-MM-JJ | --hours N | --days N] [--no-open]
+  sysstats status               état de la collecte et derniers runs
+  sysstats install | uninstall  active / retire les tâches launchd (macOS)
+"""
+import argparse
+import datetime as dt
+import html
+import json
+import os
+import re
+import shutil
+import sqlite3
+import subprocess
+import sys
+import time
+
+HOME = os.path.expanduser("~")
+BASE = os.path.join(HOME, ".local", "share", "sysstats")
+DB = os.path.join(BASE, "stats.db")
+REPORTS = os.path.join(BASE, "reports")
+RETENTION_DAYS = 90
+TOP_N = 25
+DU_MIN_KB = 200 * 1024  # on ne garde que les dossiers >= 200 Mo
+DU_TARGETS = [(HOME, 3), ("/Applications", 1), ("/opt/homebrew", 2), ("/Library", 1)]
+INTERPRETERS = {"python", "python3", "Python", "node", "ruby", "perl", "bash", "sh", "zsh", "fish", "bun", "deno", "java"}
+
+
+def sh(args, timeout=60):
+    try:
+        return subprocess.run(args, capture_output=True, text=True, timeout=timeout).stdout
+    except Exception:
+        return ""
+
+
+def db():
+    os.makedirs(BASE, exist_ok=True)
+    c = sqlite3.connect(DB, timeout=30)
+    c.executescript("""
+    CREATE TABLE IF NOT EXISTS samples(ts INTEGER PRIMARY KEY, load1 REAL, load5 REAL, load15 REAL,
+      cpu_user REAL, cpu_sys REAL, ncpu INTEGER, mem_total INTEGER, mem_used INTEGER, mem_compressed INTEGER,
+      mem_wired INTEGER, mem_free_pct INTEGER, swap_used INTEGER, swap_total INTEGER, disk_total INTEGER, disk_used INTEGER);
+    CREATE TABLE IF NOT EXISTS procs(ts INTEGER, name TEXT, cpu REAL, rss INTEGER, n INTEGER);
+    CREATE INDEX IF NOT EXISTS procs_ts ON procs(ts);
+    CREATE TABLE IF NOT EXISTS dirs(day TEXT, path TEXT, kb INTEGER, PRIMARY KEY(day, path));
+    CREATE TABLE IF NOT EXISTS runs(job TEXT PRIMARY KEY, ts INTEGER, ok INTEGER, detail TEXT);
+    """)
+    return c
+
+
+# ---------------------------------------------------------------- collecte
+
+def proc_label(command):
+    parts = command.split()
+    exe = parts[0] if parts else command
+    m = re.match(r"(.*?/([^/]+)\.app)/", command)
+    base = os.path.basename(exe)
+    if re.sub(r"[\d.]+$", "", base) in INTERPRETERS or base in INTERPRETERS:
+        for a in parts[1:]:
+            if not a.startswith("-"):
+                interp = re.sub(r"[\d.]+$", "", base).lower()
+                return f"{interp}: {os.path.basename(a)}"[:60]
+        return base
+    if m and not m.group(2).startswith("Python"):
+        return m.group(2)
+    return base[:60] or "?"
+
+
+def collect():
+    ts = int(time.time())
+    load1, load5, load15 = os.getloadavg()
+    cpu_user = cpu_sys = None
+    for line in sh(["top", "-l", "2", "-n", "0", "-s", "1"]).splitlines():
+        m = re.search(r"CPU usage: ([\d.]+)% user, ([\d.]+)% sys", line)
+        if m:
+            cpu_user, cpu_sys = float(m.group(1)), float(m.group(2))  # garde le 2e échantillon
+    ncpu = os.cpu_count() or 1
+    mem_total = int(sh(["sysctl", "-n", "hw.memsize"]).strip() or 0)
+    vm = sh(["vm_stat"])
+    page = int((re.search(r"page size of (\d+)", vm) or [0, 16384])[1])
+    def pages(label):
+        m = re.search(re.escape(label) + r":\s+(\d+)", vm)
+        return int(m.group(1)) * page if m else 0
+    wired = pages("Pages wired down")
+    compressed = pages("Pages occupied by compressor")
+    used = pages("Anonymous pages") - pages("Pages purgeable") + wired + compressed
+    free_pct = int(sh(["sysctl", "-n", "kern.memorystatus_level"]).strip() or 0)
+    sw = sh(["sysctl", "-n", "vm.swapusage"])
+    def mb(k):
+        m = re.search(k + r" = ([\d.]+)M", sw)
+        return int(float(m.group(1)) * 1048576) if m else 0
+    data_vol = "/System/Volumes/Data" if os.path.exists("/System/Volumes/Data") else "/"
+    du = shutil.disk_usage(data_vol)
+
+    agg = {}
+    for line in sh(["ps", "-Axo", "pcpu=,rss=,command="]).splitlines():
+        p = line.strip().split(None, 2)
+        if len(p) < 3:
+            continue
+        try:
+            cpu, rss = float(p[0].replace(",", ".")), int(p[1]) * 1024
+        except ValueError:
+            continue
+        name = proc_label(p[2])
+        a = agg.setdefault(name, [0.0, 0, 0])
+        a[0] += cpu; a[1] += rss; a[2] += 1
+    by_cpu = sorted(agg.items(), key=lambda kv: -kv[1][0])[:TOP_N]
+    by_mem = sorted(agg.items(), key=lambda kv: -kv[1][1])[:TOP_N]
+    keep = dict(by_cpu + by_mem)
+
+    c = db()
+    with c:
+        c.execute("INSERT OR REPLACE INTO samples VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                  (ts, load1, load5, load15, cpu_user, cpu_sys, ncpu, mem_total, used, compressed, wired,
+                   free_pct, mb("used"), mb("total"), du.total, du.used))
+        c.executemany("INSERT INTO procs VALUES(?,?,?,?,?)",
+                      [(ts, k, round(v[0], 1), v[1], v[2]) for k, v in keep.items()])
+        cutoff = ts - RETENTION_DAYS * 86400
+        c.execute("DELETE FROM samples WHERE ts < ?", (cutoff,))
+        c.execute("DELETE FROM procs WHERE ts < ?", (cutoff,))
+        c.execute("DELETE FROM dirs WHERE day < ?", (dt.date.fromtimestamp(cutoff).isoformat(),))
+    c.close()
+
+
+def du_scan():
+    day = dt.date.today().isoformat()
+    rows = {}
+    for target, depth in DU_TARGETS:
+        if not os.path.isdir(target):
+            continue
+        out = sh(["nice", "-n", "19", "du", "-xk", "-d", str(depth), target], timeout=1800)
+        for line in out.splitlines():
+            p = line.split("\t", 1)
+            if len(p) == 2 and p[0].isdigit() and int(p[0]) >= DU_MIN_KB:
+                rows[p[1]] = int(p[0])
+    if rows:
+        c = db()
+        with c:
+            c.execute("DELETE FROM dirs WHERE day=?", (day,))
+            c.executemany("INSERT INTO dirs VALUES(?,?,?)", [(day, k, v) for k, v in rows.items()])
+        c.close()
+
+
+# ---------------------------------------------------------------- rapport
+
+def gb(b):
+    return b / 1073741824
+
+
+def fmt_size(kb):
+    b = kb * 1024
+    for unit, f in (("To", 1 << 40), ("Go", 1 << 30), ("Mo", 1 << 20)):
+        if b >= f:
+            return f"{b / f:.1f} {unit}".replace(".", ",")
+    return f"{kb} Ko"
+
+
+def short_path(p):
+    return "~" + p[len(HOME):] if p.startswith(HOME) else p
+
+
+def build_report(start, end, title, out_path):
+    c = db()
+    S = c.execute("SELECT ts,load1,cpu_user,cpu_sys,ncpu,mem_total,mem_used,swap_used,disk_total,disk_used,mem_free_pct "
+                  "FROM samples WHERE ts>=? AND ts<? ORDER BY ts", (start, end)).fetchall()
+    if not S:
+        c.close()
+        return None
+    n = len(S)
+    ncpu = S[-1][4] or 1
+    # séries (sous-échantillonnées à ~600 points)
+    step = max(1, n // 600)
+    def bucket(i):
+        chunk = S[i:i + step]
+        return chunk
+    pts = []
+    for i in range(0, n, step):
+        ch = S[i:i + step]
+        cpu = [(r[2] or 0) + (r[3] or 0) for r in ch]
+        pts.append({"t": ch[0][0], "cpu": round(sum(cpu) / len(ch), 1), "load": round(max(r[1] for r in ch), 2),
+                    "mem": round(gb(sum(r[6] for r in ch) / len(ch)), 2), "swap": round(gb(max(r[7] for r in ch)), 2)})
+    cpu_all = [(r[2] or 0) + (r[3] or 0) for r in S]
+    mem_total = S[-1][5]
+    tiles = {
+        "cpu_avg": sum(cpu_all) / n, "cpu_max": max(cpu_all),
+        "load_avg": sum(r[1] for r in S) / n, "load_max": max(r[1] for r in S), "ncpu": ncpu,
+        "mem_avg": gb(sum(r[6] for r in S) / n), "mem_max": gb(max(r[6] for r in S)), "mem_total": gb(mem_total),
+        "swap_max": gb(max(r[7] for r in S)), "pressure_min": min(r[10] for r in S),
+        "disk_used": gb(S[-1][9]), "disk_total": gb(S[-1][8]), "disk_delta": gb(S[-1][9] - S[0][9]),
+        "samples": n,
+    }
+    # process
+    P = c.execute("SELECT name, SUM(cpu), MAX(cpu), SUM(rss), MAX(rss), COUNT(*) FROM procs WHERE ts>=? AND ts<? GROUP BY name",
+                  (start, end)).fetchall()
+    top_cpu = sorted(P, key=lambda r: -r[1])[:15]
+    top_mem = sorted(P, key=lambda r: -r[3])[:15]
+    # moments les plus chargés
+    peaks = sorted(S, key=lambda r: -r[1])
+    chosen = []
+    for r in peaks:
+        if all(abs(r[0] - x[0]) > 1800 for x in chosen):
+            chosen.append(r)
+        if len(chosen) == 8:
+            break
+    peak_rows = []
+    for r in sorted(chosen, key=lambda r: r[0]):
+        procs = c.execute("SELECT name, cpu FROM procs WHERE ts=? ORDER BY cpu DESC LIMIT 4", (r[0],)).fetchall()
+        peak_rows.append((r[0], r[1], (r[2] or 0) + (r[3] or 0), procs))
+    # dossiers
+    day = c.execute("SELECT MAX(day) FROM dirs WHERE day<=?", (dt.date.fromtimestamp(end - 1).isoformat(),)).fetchone()[0]
+    dirs, prev_day = [], None
+    if day:
+        prev_day = c.execute("SELECT MAX(day) FROM dirs WHERE day<?", (day,)).fetchone()[0]
+        cur = dict(c.execute("SELECT path, kb FROM dirs WHERE day=?", (day,)).fetchall())
+        prev = dict(c.execute("SELECT path, kb FROM dirs WHERE day=?", (prev_day,)).fetchall()) if prev_day else {}
+        roots = {t for t, _ in DU_TARGETS}
+        # retire un parent quand un enfant en représente >= 80 %
+        def redundant(p, kb):
+            pre = p.rstrip("/") + "/"
+            return any(q.startswith(pre) and k >= 0.8 * kb for q, k in cur.items())
+        cand = [(p, kb) for p, kb in cur.items() if p not in roots and not redundant(p, kb)]
+        for p, kb in sorted(cand, key=lambda x: -x[1])[:30]:
+            dirs.append((p, kb, (kb - prev[p]) if p in prev else None))
+    c.close()
+
+    data = {"points": pts, "range_days": (end - start) / 86400}
+    html_text = render_html(title, start, end, tiles, top_cpu, top_mem, peak_rows, dirs, day, prev_day, data)
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    with open(out_path, "w") as f:
+        f.write(html_text)
+    # nettoyage des vieux rapports
+    cutoff = time.time() - RETENTION_DAYS * 86400
+    for fn in os.listdir(REPORTS):
+        fp = os.path.join(REPORTS, fn)
+        if os.path.isfile(fp) and os.path.getmtime(fp) < cutoff:
+            os.remove(fp)
+    return out_path
+
+
+def nf(x, d=1):
+    return f"{x:.{d}f}".replace(".", ",")
+
+
+def render_html(title, start, end, t, top_cpu, top_mem, peaks, dirs, day, prev_day, data):
+    e = html.escape
+    def when(ts, fmt="%d/%m %H:%M"):
+        return dt.datetime.fromtimestamp(ts).strftime(fmt)
+    def bars(rows, val, fmt, sub):
+        mx = max((val(r) for r in rows), default=1) or 1
+        out = []
+        for r in rows:
+            v = val(r)
+            out.append(f'<div class="bar-row"><div class="bar-label" title="{e(r[0])}">{e(r[0])}</div>'
+                       f'<div class="bar-track"><div class="bar" style="width:{max(1, 100 * v / mx):.1f}%"></div></div>'
+                       f'<div class="bar-val">{fmt(v)}<span>{sub(r)}</span></div></div>')
+        return "\n".join(out)
+    nS = t["samples"]
+    cpu_bars = bars(top_cpu, lambda r: r[1] / nS, lambda v: nf(v) + " %", lambda r: f"pic {nf(r[2], 0)} %")
+    mem_bars = bars(top_mem, lambda r: gb(r[3] / nS), lambda v: nf(v, 2) + " Go", lambda r: f"pic {nf(gb(r[4]), 2)} Go")
+    peak_html = "".join(
+        f"<tr><td>{when(ts)}</td><td class=num>{nf(l, 1)}</td><td class=num>{nf(cpu, 0)} %</td>"
+        f"<td>{', '.join(f'{e(n)} <span class=dim>{nf(c, 0)} %</span>' for n, c in procs)}</td></tr>"
+        for ts, l, cpu, procs in peaks)
+    def delta(d):
+        if d is None:
+            return '<span class="dim">nouveau</span>'
+        if abs(d) < 50 * 1024:
+            return '<span class="dim">=</span>'
+        return f'<span class="{"up" if d > 0 else "down"}">{"+" if d > 0 else "−"}{fmt_size(abs(d))}</span>'
+    dir_html = "".join(f"<tr><td class=path title='{e(p)}'>{e(short_path(p))}</td><td class=num>{fmt_size(kb)}</td>"
+                       f"<td class=num>{delta(d)}</td></tr>" for p, kb, d in dirs)
+    dir_note = (f"Scan du {day}" + (f", comparé au {prev_day}" if prev_day else "") + ".") if day else \
+        "Pas encore de scan des dossiers : il tourne une fois par jour (ou <code>sysstats du</code>)."
+    sat = t["load_max"] / t["ncpu"]
+    disk_pct = 100 * t["disk_used"] / t["disk_total"]
+    return f"""<!doctype html><html lang="fr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Charge machine — {e(title)}</title>
+<style>
+:root{{--page:#f9f9f7;--surface:#fcfcfb;--ink:#0b0b0b;--ink2:#52514e;--muted:#898781;--grid:#e1e0d9;--axis:#c3c2b7;
+--s1:#2a78d6;--s2:#eb6834;--up:#d03b3b;--down:#006300;--warn:#fab219;--border:#e1e0d9}}
+@media (prefers-color-scheme:dark){{:root{{--page:#0d0d0d;--surface:#1a1a19;--ink:#f0efec;--ink2:#c3c2b7;--muted:#898781;
+--grid:#2c2c2a;--axis:#383835;--s1:#3987e5;--s2:#d95926;--up:#e66767;--down:#0ca30c;--border:#2c2c2a}}}}
+*{{box-sizing:border-box}}body{{margin:0;background:var(--page);color:var(--ink);font:14px/1.45 -apple-system,BlinkMacSystemFont,"Inter",sans-serif;font-variant-numeric:tabular-nums}}
+main{{max-width:1180px;margin:0 auto;padding:24px 16px 48px}}h1{{font-size:22px;margin:0 0 4px}}h2{{font-size:15px;margin:0 0 12px}}
+.sub{{color:var(--ink2);margin:0 0 20px}}.dim{{color:var(--muted)}}
+.tiles{{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:16px}}
+.card{{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px}}
+.tile .k{{color:var(--ink2);font-size:12px}}.tile .v{{font-size:24px;font-weight:600;margin:2px 0}}.tile .d{{color:var(--muted);font-size:12px}}
+.grid2{{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(520px,100%),1fr));gap:16px;margin-bottom:16px}}
+.chart{{position:relative}}.chart svg{{width:100%;height:220px;display:block}}
+.legend{{display:flex;gap:14px;font-size:12px;color:var(--ink2);margin:-4px 0 8px}}.legend i{{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}}
+.tip{{position:absolute;pointer-events:none;background:var(--surface);border:1px solid var(--axis);border-radius:6px;padding:6px 8px;font-size:12px;white-space:nowrap;display:none;box-shadow:0 2px 8px #0002}}
+.bar-row{{display:grid;grid-template-columns:minmax(0,190px) 1fr 130px;gap:10px;align-items:center;margin:5px 0}}
+.bar-label{{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}.bar-track{{height:10px}}
+.bar{{height:100%;background:var(--s1);border-radius:0 4px 4px 0}}.bar-val{{text-align:right;font-weight:600}}.bar-val span{{display:block;font-weight:400;font-size:11px;color:var(--muted)}}
+table{{width:100%;border-collapse:collapse}}td,th{{padding:6px 8px;border-bottom:1px solid var(--grid);text-align:left;vertical-align:top}}
+th{{font-size:12px;color:var(--ink2);font-weight:500}}.num{{text-align:right;white-space:nowrap}}.path{{word-break:break-all}}
+.up{{color:var(--up)}}.down{{color:var(--down)}}code{{font-size:12px}}
+@media (max-width:560px){{.bar-row{{grid-template-columns:minmax(0,1fr) 90px}}.bar-track{{display:none}}}}
+</style></head><body><main>
+<h1>Charge machine — {e(title)}</h1>
+<p class="sub">{when(start)} → {when(end)} · {nS} échantillons (toutes les 5 min) · généré le {dt.datetime.now().strftime("%d/%m/%Y %H:%M")}</p>
+<div class="tiles">
+<div class="card tile"><div class="k">CPU moyen</div><div class="v">{nf(t["cpu_avg"], 0)} %</div><div class="d">pic {nf(t["cpu_max"], 0)} %</div></div>
+<div class="card tile"><div class="k">Charge (load) max</div><div class="v">{nf(t["load_max"])}</div><div class="d">{nf(sat * 100, 0)} % de {t["ncpu"]} cœurs · moy. {nf(t["load_avg"])}</div></div>
+<div class="card tile"><div class="k">RAM utilisée moy.</div><div class="v">{nf(t["mem_avg"])} Go</div><div class="d">pic {nf(t["mem_max"])} / {nf(t["mem_total"], 0)} Go</div></div>
+<div class="card tile"><div class="k">Swap max</div><div class="v">{nf(t["swap_max"])} Go</div><div class="d">mémoire libre min. {t["pressure_min"]} %</div></div>
+<div class="card tile"><div class="k">Disque</div><div class="v">{nf(disk_pct, 0)} %</div><div class="d">{nf(t["disk_used"], 0)} / {nf(t["disk_total"], 0)} Go · {"+" if t["disk_delta"] >= 0 else "−"}{nf(abs(t["disk_delta"]))} Go sur la période</div></div>
+</div>
+<div class="grid2">
+<div class="card"><h2>CPU (user + sys, %)</h2><div class="chart" id="c-cpu"></div></div>
+<div class="card"><h2>Charge (load average 1 min) — {t["ncpu"]} cœurs = saturation</h2><div class="chart" id="c-load"></div></div>
+<div class="card"><h2>Mémoire (Go)</h2><div class="legend"><span><i style="background:var(--s1)"></i>RAM utilisée</span><span><i style="background:var(--s2)"></i>Swap</span></div><div class="chart" id="c-mem"></div></div>
+<div class="card"><h2>Moments les plus chargés</h2><table><tr><th>Quand</th><th class=num>Load</th><th class=num>CPU</th><th>Process en tête</th></tr>{peak_html}</table></div>
+</div>
+<div class="grid2">
+<div class="card"><h2>Process — CPU moyen (% d'un cœur)</h2>{cpu_bars}</div>
+<div class="card"><h2>Process — RAM moyenne</h2>{mem_bars}</div>
+</div>
+<div class="card"><h2>Plus gros dossiers</h2><p class="sub" style="margin:-6px 0 8px">{dir_note}</p>
+<table><tr><th>Dossier</th><th class=num>Taille</th><th class=num>Évolution</th></tr>{dir_html}</table></div>
+<p class="sub" style="margin-top:16px">Les process sont regroupés par application (les helpers Chrome sous « Google Chrome ») ou par script pour Python/Node. Données : <code>{e(short_path(DB))}</code></p>
+</main>
+<script>
+const D={json.dumps(data)};
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const fmtT=t=>{{const d=new Date(t*1000);return D.range_days>1.5?d.toLocaleDateString('fr-FR',{{day:'2-digit',month:'2-digit'}})+' '+d.toLocaleTimeString('fr-FR',{{hour:'2-digit',minute:'2-digit'}}):d.toLocaleTimeString('fr-FR',{{hour:'2-digit',minute:'2-digit'}})}};
+function chart(id,series,unit,yMaxMin,refLine){{
+  const el=document.getElementById(id),P=D.points;if(!P.length)return;
+  const W=Math.max(320,el.clientWidth),H=220,L=40,R=10,T=10,B=24,NS='http://www.w3.org/2000/svg';
+  let raw=Math.max(yMaxMin,...series.flatMap(s=>P.map(p=>p[s.k])),refLine||0)*1.05,st=Math.pow(10,Math.floor(Math.log10(raw/4)));st=[1,2,2.5,5,10].map(m=>m*st).find(v=>v*4>=raw);let ymax=st*4;
+  const t0=P[0].t,t1=P[P.length-1].t||t0+1,x=t=>L+(W-L-R)*(t-t0)/Math.max(1,t1-t0),y=v=>T+(H-T-B)*(1-v/ymax);
+  let s=`<svg xmlns="${{NS}}" viewBox="0 0 ${{W}} ${{H}}" style="height:${{H}}px">`;
+  for(let i=0;i<=4;i++){{const v=ymax*i/4,yy=y(v);s+=`<line x1="${{L}}" x2="${{W-R}}" y1="${{yy}}" y2="${{yy}}" stroke="${{css(i?'--grid':'--axis')}}"/><text x="${{L-6}}" y="${{yy+4}}" text-anchor="end" font-size="11" fill="${{css('--muted')}}">${{v.toFixed(ymax<10?1:0)}}</text>`}}
+  const nt=Math.min(6,P.length);for(let i=0;i<nt;i++){{const t=t0+(t1-t0)*i/Math.max(1,nt-1);s+=`<text x="${{x(t)}}" y="${{H-6}}" text-anchor="${{i==0?'start':i==nt-1?'end':'middle'}}" font-size="11" fill="${{css('--muted')}}">${{fmtT(t)}}</text>`}}
+  if(refLine)s+=`<line x1="${{L}}" x2="${{W-R}}" y1="${{y(refLine)}}" y2="${{y(refLine)}}" stroke="${{css('--warn')}}" stroke-dasharray="4 4"/>`;
+  for(const se of series){{const pts=P.map(p=>`${{x(p.t).toFixed(1)}},${{y(p[se.k]).toFixed(1)}}`).join(' ');
+    if(se.fill)s+=`<polygon points="${{x(t0)}},${{y(0)}} ${{pts}} ${{x(t1)}},${{y(0)}}" fill="${{css(se.c)}}" opacity=".14"/>`;
+    s+=`<polyline points="${{pts}}" fill="none" stroke="${{css(se.c)}}" stroke-width="2" stroke-linejoin="round"/>`}}
+  s+=`<line id="${{id}}-x" y1="${{T}}" y2="${{H-B}}" stroke="${{css('--axis')}}" visibility="hidden"/>`;
+  for(const se of series)s+=`<circle id="${{id}}-${{se.k}}" r="4" fill="${{css(se.c)}}" stroke="${{css('--surface')}}" stroke-width="2" visibility="hidden"/>`;
+  el.innerHTML=s+'</svg><div class="tip"></div>';
+  const svg=el.querySelector('svg'),tip=el.querySelector('.tip'),xl=el.querySelector(`#${{id}}-x`);
+  svg.addEventListener('mousemove',ev=>{{const r=svg.getBoundingClientRect(),mx=(ev.clientX-r.left)*W/r.width;
+    let i=0,bd=1e18;P.forEach((p,j)=>{{const d=Math.abs(x(p.t)-mx);if(d<bd){{bd=d;i=j}}}});const p=P[i],xx=x(p.t);
+    xl.setAttribute('x1',xx);xl.setAttribute('x2',xx);xl.setAttribute('visibility','visible');
+    for(const se of series){{const c=el.querySelector(`#${{id}}-${{se.k}}`);c.setAttribute('cx',xx);c.setAttribute('cy',y(p[se.k]));c.setAttribute('visibility','visible')}}
+    tip.innerHTML=`<b>${{new Date(p.t*1000).toLocaleString('fr-FR',{{weekday:'short',hour:'2-digit',minute:'2-digit'}})}}</b><br>`+series.map(se=>`${{se.n}} : <b>${{p[se.k].toLocaleString('fr-FR')}} ${{unit}}</b>`).join('<br>');
+    tip.style.display='block';const px=xx*r.width/W;tip.style.left=Math.min(px+12,r.width-tip.offsetWidth)+'px';tip.style.top='8px'}});
+  svg.addEventListener('mouseleave',()=>{{tip.style.display='none';el.querySelectorAll('svg [visibility]').forEach(n=>n.setAttribute('visibility','hidden'))}});
+}}
+function draw(){{chart('c-cpu',[{{k:'cpu',n:'CPU',c:'--s1',fill:1}}],'%',100);
+chart('c-load',[{{k:'load',n:'Load',c:'--s1',fill:1}}],'',{t["ncpu"]},{t["ncpu"]});
+chart('c-mem',[{{k:'mem',n:'RAM',c:'--s1'}},{{k:'swap',n:'Swap',c:'--s2'}}],'Go',{nf(t["mem_total"], 0).replace(",", ".")});}}
+draw();let rt;addEventListener('resize',()=>{{clearTimeout(rt);rt=setTimeout(draw,150)}});
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change',draw);
+</script></body></html>"""
+
+
+def report(args):
+    now = time.time()
+    if args.date:
+        d = dt.date.fromisoformat(args.date)
+        start = int(time.mktime(d.timetuple()))
+        end = start + 86400
+        title, name = d.strftime("%A %d/%m/%Y"), f"{d.isoformat()}.html"
+    else:
+        hours = args.days * 24 if args.days else (args.hours or 24)
+        start, end = int(now - hours * 3600), int(now) + 1
+        title = f"{args.days} derniers jours" if args.days else f"{hours} dernières heures"
+        name = f"demande-{dt.datetime.now().strftime('%Y-%m-%d_%H%M')}.html"
+    path = build_report(start, end, title, os.path.join(REPORTS, name))
+    record("report", path is not None, path or "aucun échantillon")
+    if not path:
+        print("Aucun échantillon sur cette période (la collecte tourne-t-elle ? `sysstats status`).", file=sys.stderr)
+        return 1
+    print(path)
+    if not args.no_open:
+        subprocess.run(["open", path])
+    return 0
+
+
+def daily():
+    du_scan()
+    d = (dt.datetime.now() - dt.timedelta(hours=6)).date()  # lancé après minuit au réveil → la veille
+    start = int(time.mktime(d.timetuple()))
+    path = build_report(start, start + 86400, d.strftime("%A %d/%m/%Y"), os.path.join(REPORTS, f"{d.isoformat()}.html"))
+    if path:
+        print(path)
+    return path
+
+
+def record(job, ok, detail=""):
+    try:
+        c = db()
+        with c:
+            c.execute("INSERT OR REPLACE INTO runs VALUES(?,?,?,?)", (job, int(time.time()), int(bool(ok)), detail[:300]))
+        c.close()
+    except Exception:
+        pass
+
+
+# ---------------------------------------------------------------- launchd
+
+LABELS = {"collect": "local.sysstats.collect", "daily": "local.sysstats.daily"}
+AGENTS = os.path.join(HOME, "Library", "LaunchAgents")
+SCHEDULES = {
+    "collect": "<key>StartInterval</key><integer>300</integer>\n  <key>RunAtLoad</key><true/>",
+    "daily": "<key>StartCalendarInterval</key><dict><key>Hour</key><integer>23</integer>"
+             "<key>Minute</key><integer>55</integer></dict>",
+}
+
+
+def plist(job):
+    exe = os.path.join(HOME, ".local", "bin", "sysstats")
+    log = os.path.join(BASE, f"{job}.log")
+    return f"""<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>{LABELS[job]}</string>
+  <key>ProgramArguments</key><array><string>/usr/bin/python3</string><string>{exe}</string><string>{job}</string></array>
+  {SCHEDULES[job]}
+  <key>Nice</key><integer>10</integer>
+  <key>LowPriorityIO</key><true/>
+  <key>ProcessType</key><string>Background</string>
+  <key>StandardOutPath</key><string>{log}</string>
+  <key>StandardErrorPath</key><string>{log}</string>
+</dict></plist>
+"""
+
+
+def install():
+    if sys.platform != "darwin":
+        print("sysstats install : macOS uniquement (launchd).", file=sys.stderr)
+        return 1
+    os.makedirs(AGENTS, exist_ok=True)
+    os.makedirs(BASE, exist_ok=True)
+    domain = f"gui/{os.getuid()}"
+    for job, label in LABELS.items():
+        path = os.path.join(AGENTS, f"{label}.plist")
+        subprocess.run(["launchctl", "bootout", f"{domain}/{label}"], capture_output=True)
+        with open(path, "w") as f:
+            f.write(plist(job))
+        r = subprocess.run(["launchctl", "bootstrap", domain, path], capture_output=True, text=True)
+        print(f"{'✓' if r.returncode == 0 else '✗'} {label}  {r.stderr.strip()}")
+    db().close()
+    return 0
+
+
+def uninstall():
+    domain = f"gui/{os.getuid()}"
+    for label in LABELS.values():
+        subprocess.run(["launchctl", "bootout", f"{domain}/{label}"], capture_output=True)
+        path = os.path.join(AGENTS, f"{label}.plist")
+        if os.path.exists(path):
+            os.remove(path)
+        print(f"✓ {label} retiré")
+    print(f"Données conservées dans {BASE}")
+    return 0
+
+
+def launchd_state(label):
+    out = sh(["launchctl", "print", f"gui/{os.getuid()}/{label}"], timeout=10)
+    if not out:
+        return "non chargé"
+    m = re.search(r"last exit code = (\S+)", out)
+    code = m.group(1) if m else ""
+    if not code or code.startswith("("):
+        return "chargé, pas encore exécuté"
+    return "chargé, OK" if code == "0" else f"chargé, dernier code de sortie {code}"
+
+
+def status():
+    c = db()
+    n, first, last = c.execute("SELECT COUNT(*), MIN(ts), MAX(ts) FROM samples").fetchone()
+    ndays, last_day = c.execute("SELECT COUNT(DISTINCT day), MAX(day) FROM dirs").fetchone()
+    runs = {r[0]: r[1:] for r in c.execute("SELECT job, ts, ok, detail FROM runs")}
+    c.close()
+    f = lambda ts: dt.datetime.fromtimestamp(ts).strftime("%a %d/%m %H:%M") if ts else "—"
+    def ago(ts):
+        if not ts:
+            return ""
+        m = int((time.time() - ts) / 60)
+        return f"(il y a {m} min)" if m < 120 else f"(il y a {m // 60} h)" if m < 2880 else f"(il y a {m // 1440} j)"
+    print("Derniers runs")
+    for job, label in (("collect", "collecte"), ("du", "scan dossiers"), ("daily", "rapport du jour"), ("report", "rapport à la demande")):
+        ts, ok, detail = runs.get(job, (None, 1, ""))
+        mark = "" if ok else "  ✗ " + detail
+        print(f"  {label:<22}{f(ts):<16}{ago(ts)}{mark}")
+    print("\nDonnées")
+    print(f"  échantillons          {n} (du {f(first)} au {f(last)})")
+    print(f"  scans dossiers        {ndays} (dernier : {last_day or '—'})")
+    reps = sorted((os.path.join(REPORTS, x) for x in os.listdir(REPORTS)), key=os.path.getmtime) if os.path.isdir(REPORTS) else []
+    print(f"  rapports              {len(reps)}" + (f" (dernier : {os.path.basename(reps[-1])})" if reps else ""))
+    if sys.platform == "darwin":
+        print("\nTâches launchd")
+        for job, label in LABELS.items():
+            print(f"  {label:<26}{launchd_state(label)}")
+    print(f"\nbase : {short_path(DB)}\nrapports : {short_path(REPORTS)}")
+
+
+def main():
+    ap = argparse.ArgumentParser(prog="sysstats", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = ap.add_subparsers(dest="cmd", required=True)
+    for name in ("collect", "du", "daily", "status", "install", "uninstall", "path"):
+        sub.add_parser(name)
+    r = sub.add_parser("report")
+    g = r.add_mutually_exclusive_group()
+    g.add_argument("--date"); g.add_argument("--hours", type=int); g.add_argument("--days", type=int)
+    r.add_argument("--no-open", action="store_true")
+    a = ap.parse_args()
+    simple = {"status": status, "install": install, "uninstall": uninstall,
+              "path": lambda: print(REPORTS)}
+    if a.cmd in simple:
+        return simple[a.cmd]() or 0
+    if a.cmd == "report":
+        return report(a)
+    # tâches planifiées : on trace le résultat et les erreurs
+    jobs = {"collect": collect, "du": du_scan, "daily": daily}
+    try:
+        res = jobs[a.cmd]()
+        record(a.cmd, True, res or "")
+        if a.cmd == "daily":
+            record("du", True)
+    except Exception as exc:
+        record(a.cmd, False, f"{type(exc).__name__}: {exc}")
+        raise
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
