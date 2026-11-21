@@ -173,32 +173,6 @@ All custom keymaps defined in this configuration. LazyVim default keymaps are no
 
 ---
 
-## Notes / Zettelkasten (`<leader>z`)
-
-| Mode | Key | Description |
-|------|-----|-------------|
-| `n` | `<leader>zn` | New note |
-| `n` | `<leader>zp` | New project note |
-| `n` | `<leader>zi` | New incident note |
-| `n` | `<leader>zd` | Daily note |
-| `n` | `<leader>zf` | Find notes |
-| `n` | `<leader>zt` | Find by tags |
-| `n` | `<leader>zg` | Grep notes |
-| `n` | `<leader>zl` | Insert link |
-| `v` | `<leader>zl` | Insert link at selection |
-| `n` | `<leader>zb` | Backlinks |
-| `n` | `<leader>zo` | Outgoing links |
-| `v` | `<leader>znt` | New note from title selection |
-| `v` | `<leader>znc` | New note from content selection |
-
-**Markdown buffers only:**
-
-| Mode | Key | Description |
-|------|-----|-------------|
-| `n` | `<CR>` | Follow link |
-| `n` | `<BS>` | Go back |
-
----
 
 ## Snippets
 
