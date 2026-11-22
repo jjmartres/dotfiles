@@ -57,6 +57,33 @@ Le CPU par processus est en % d'un cœur. Il est sous-estimé pour les processus
 - Les onglets sont gardés volontairement, et les groupes enregistrés sont déjà utilisés.
 - Relevé le 2026-11-22 à 11h40 : 57 processus (50 renderers), 8,2 Go RSS, 2 % CPU.
 
+## Stockage (ajouté le 2026-11-22)
+
+Espace libre passé d'environ 209 Go à **543 Go** (environ 330 Go récupérés) :
+
+| Poste | Gain |
+|---|---|
+| Providers Terraform copiés dans chaque `.terraform/` | 108 Go |
+| VM `colima` : `docker system prune -a -f` puis `fstrim` | 92 Go |
+| Caches régénérables (uv, npm, trivy, pre-commit, go, brew, Cypress, puppeteer, pip…) | environ 18 Go |
+| Logs `gcloud` | 16 Go |
+| `node_modules` / `.venv` de repos inactifs (66 dossiers) | environ 15 Go |
+| `opencode.db` : `VACUUM` (14 Go → 4,4 Go) | environ 10 Go |
+| Libéré par macOS lui-même (snapshots ou espace purgeable, non vérifié) | environ 70 Go |
+
+Pas touchés : `~/Library/Caches/Google`, les données astro, les volumes Docker.
+
+- **Cache Terraform partagé** : nouveau package stow `terraform` (`~/.terraformrc`, avec `plugin_cache_dir = "$HOME/.terraform.d/plugin-cache"`), et le hook `bootstrap.d/post-stow/terraform.sh` qui crée le dossier. Les providers sont désormais des liens vers ce cache au lieu de copies.
+- **Fonction `clean_storage`** : elle affiche ce qui est récupérable puis demande confirmation.
+  - Options : `--dry-run`, `--yes`, `--docker`, `--deps`, `--all` et `--path DIR`.
+  - Les repos listés dans `CLEAN_STORAGE_KEEP` ne sont jamais vidés de leurs dépendances.
+  - Le `VACUUM` est sauté si `opencode` tourne, et le cache `uv` s'il est verrouillé par un `uvx` en cours.
+  - PRs #29 et #30.
+- **Planification** : l'agent launchd `local.clean_storage` lance `clean_storage --yes` le 1er et le 16 de chaque mois à 12h30.
+  - Il se contente du nettoyage sûr, sans `--docker` ni `--deps`. Il tourne en priorité basse et le log est dans `~/.local/share/clean_storage/clean_storage.log`.
+  - Pour changer ce qu'il fait : `clean_storage --schedule --docker`. Pour le retirer : `clean_storage --unschedule`.
+  - Premier passage prévu le 2026-12-01.
+
 ## Non traité (laissé tel quel volontairement)
 - `pi` : 22 % CPU, 2,3 Go. Il appelle `gcloud config config-helper` régulièrement, sans doute pour l'authentification Vertex.
 - `jest` dans `nibbler_ts` : il appelle `gcloud config config-helper` car l'authentification GCP n'est pas simulée dans les tests unitaires. Pics `processChild.js` à 635 %.
@@ -79,10 +106,16 @@ sqlite3 $DB "select count(*) from pinfo where args like '%gcloud.py pam grants%'
 
 # Toujours aucun log gcloud ?
 find ~/.config/gcloud/logs -type f | wc -l
+
+# Tâche clean_storage chargée, et état du dernier passage
+launchctl print gui/(id -u)/local.clean_storage | grep -E 'state|last exit'
+tail -20 ~/.local/share/clean_storage/clean_storage.log
+df -h /System/Volumes/Data
 ```
 
 Points à contrôler :
 - Le CPU moyen doit avoir nettement baissé (référence : 56 %) et `gcloud.py` doit avoir quasiment disparu du top.
 - `mds_stores` et `mediaanalysisd` doivent être proches de 0 en dehors des pics ponctuels.
 - Chrome : moins de processus et de RAM en moyenne (référence : 88 processus, 7,4 Go).
+- Stockage : l'espace libre doit rester autour de 540 Go (référence au 2026-11-22). `clean_storage --dry-run` montre ce qui s'est accumulé depuis.
 - Selon ce qui reste en tête : traiter `pi`, `jest` et `colima`.
