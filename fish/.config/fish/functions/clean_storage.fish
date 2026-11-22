@@ -4,6 +4,8 @@ function clean_storage --description "Libère de l'espace disque : caches d'outi
     set -l with_docker 0
     set -l with_deps 0
     set -l root $HOME/Repositories
+    set -l schedule ""
+    set -l job_flags
 
     # Repos dont les dépendances servent à des outils actifs (agents, serveurs MCP) : --deps n'y touche pas.
     # Surchargeable : set -U CLEAN_STORAGE_KEEP perso/farnswrth perso/mon-outil
@@ -21,11 +23,14 @@ function clean_storage --description "Libère de l'espace disque : caches d'outi
                 set assume_yes 1
             case --docker
                 set with_docker 1
+                set -a job_flags --docker
             case --deps
                 set with_deps 1
+                set -a job_flags --deps
             case --all
                 set with_docker 1
                 set with_deps 1
+                set -a job_flags --all
             case --path
                 set i (math $i + 1)
                 if test $i -gt (count $argv); or not test -d "$argv[$i]"
@@ -35,8 +40,15 @@ function clean_storage --description "Libère de l'espace disque : caches d'outi
                     return 1
                 end
                 set root (realpath $argv[$i])
+                set -a job_flags --path $root
+            case --schedule
+                set schedule install
+            case --unschedule
+                set schedule uninstall
             case -h --help
                 echo "Usage: clean_storage [--dry-run] [--yes] [--docker] [--deps] [--all] [--path DIR]"
+                echo "       clean_storage --schedule [--docker] [--deps] [--all] [--path DIR]"
+                echo "       clean_storage --unschedule"
                 echo ""
                 echo "Toujours :"
                 echo "  - .terraform/providers copiés en dur sous DIR (re-liés depuis ~/.terraform.d/plugin-cache au prochain init)"
@@ -49,6 +61,9 @@ function clean_storage --description "Libère de l'espace disque : caches d'outi
                 echo "  --path DIR  racine des repos (défaut : ~/Repositories)"
                 echo "  --dry-run   affiche seulement ce qui serait libéré"
                 echo "  --yes       ne demande pas de confirmation"
+                echo "  --schedule  lance clean_storage --yes (+ options données) le 1er et le 16 du mois à 12:30 (launchd)"
+                echo "              log : ~/.local/share/clean_storage/clean_storage.log"
+                echo "  --unschedule  retire la tâche planifiée"
                 echo ""
                 echo "Jamais : ~/Library/Caches/Google, données utilisateur, volumes Docker."
                 return 0
@@ -59,6 +74,64 @@ function clean_storage --description "Libère de l'espace disque : caches d'outi
                 return 1
         end
         set i (math $i + 1)
+    end
+
+    # --- Planification launchd (macOS) ------------------------------------
+    if test -n "$schedule"
+        if not type -q launchctl
+            set_color red
+            echo "La planification utilise launchd (macOS uniquement)"
+            set_color normal
+            return 1
+        end
+        set -l label local.clean_storage
+        set -l plist $HOME/Library/LaunchAgents/$label.plist
+        set -l domain gui/(id -u)
+        launchctl bootout $domain/$label >/dev/null 2>&1
+
+        if test $schedule = uninstall
+            rm -f $plist
+            echo "Tâche planifiée retirée."
+            return 0
+        end
+
+        set -l log_dir $HOME/.local/share/clean_storage
+        command mkdir -p $log_dir $HOME/Library/LaunchAgents
+        set -l cmd "date; clean_storage --yes"
+        for f in $job_flags
+            set cmd "$cmd "(string escape -- $f)
+        end
+        set -l days
+        for d in 1 16
+            set -a days "    <dict><key>Day</key><integer>$d</integer><key>Hour</key><integer>12</integer><key>Minute</key><integer>30</integer></dict>"
+        end
+        printf '%s\n' \
+            '<?xml version="1.0" encoding="UTF-8"?>' \
+            '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">' \
+            '<plist version="1.0"><dict>' \
+            "  <key>Label</key><string>$label</string>" \
+            "  <key>ProgramArguments</key><array><string>"(command -s fish)"</string><string>-c</string><string>$cmd</string></array>" \
+            '  <key>StartCalendarInterval</key><array>' \
+            $days \
+            '  </array>' \
+            '  <key>Nice</key><integer>10</integer>' \
+            '  <key>LowPriorityIO</key><true/>' \
+            '  <key>ProcessType</key><string>Background</string>' \
+            "  <key>StandardOutPath</key><string>$log_dir/clean_storage.log</string>" \
+            "  <key>StandardErrorPath</key><string>$log_dir/clean_storage.log</string>" \
+            '</dict></plist>' >$plist
+        if not launchctl bootstrap $domain $plist
+            set_color red
+            echo "launchctl bootstrap a échoué ($plist)"
+            set_color normal
+            return 1
+        end
+        set_color green
+        echo "Planifié : fish -c '$cmd'"
+        set_color normal
+        echo "Le 1er et le 16 du mois à 12:30 (rattrapé au réveil si le Mac dormait)"
+        echo "Log : $log_dir/clean_storage.log"
+        return 0
     end
 
     # --- Inventaire -------------------------------------------------------
@@ -72,7 +145,7 @@ function clean_storage --description "Libère de l'espace disque : caches d'outi
     # Providers Terraform copiés (pas des symlinks vers le cache)
     set -l tf_dirs
     for d in (find $root -type d -name .terraform -prune 2>/dev/null)
-        if test -d $d/providers; and test -n "(find $d/providers -type f -name 'terraform-provider-*' -print -quit 2>/dev/null)"
+        if test -d $d/providers; and test (count (find $d/providers -type f -name 'terraform-provider-*' -print -quit 2>/dev/null)) -gt 0
             set -a tf_dirs $d/providers
         end
     end
@@ -190,7 +263,7 @@ function clean_storage --description "Libère de l'espace disque : caches d'outi
     for d in $tf_dirs
         rm -rf -- $d
     end
-    mkdir -p $HOME/.terraform.d/plugin-cache
+    command mkdir -p $HOME/.terraform.d/plugin-cache
 
     for d in $cache_dirs
         if test -d $d
@@ -198,7 +271,7 @@ function clean_storage --description "Libère de l'espace disque : caches d'outi
             rm -rf -- $d
         end
     end
-    mkdir -p $HOME/.config/gcloud/logs
+    command mkdir -p $HOME/.config/gcloud/logs
 
     if type -q uv
         # Un serveur MCP lancé par uvx garde le verrou : ne pas bloquer 5 min
@@ -238,7 +311,7 @@ function clean_storage --description "Libère de l'espace disque : caches d'outi
     set -l free_after (df -k $HOME | awk 'NR==2 {print $4}')
     echo ""
     set_color green
-    printf "Libéré : %.1f Go  (libre : %.0f Go)\n" (math "($free_after - $free_before) / 1048576") (math $free_after / 1048576)
+    printf "Libéré : %.1f Go  (libre : %.0f Go)\n" (math "max(0, $free_after - $free_before) / 1048576") (math $free_after / 1048576)
     set_color normal
     return 0
 end

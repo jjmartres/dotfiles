@@ -8,3 +8,5 @@ complete -c clean_storage -l all -n "not contains -- --all (commandline -opc); a
 complete -c clean_storage -l path -r -n "not contains -- --path (commandline -opc)" -d "Racine des repos (défaut : ~/Repositories)"
 complete -c clean_storage -F -n "__fish_prev_arg_in --path"
 complete -c clean_storage -s h -l help -d "Aide"
+complete -c clean_storage -l schedule -n "not contains -- --unschedule (commandline -opc)" -d "Planifier le 1er et le 16 du mois (launchd)"
+complete -c clean_storage -l unschedule -n "not contains -- --schedule (commandline -opc)" -d "Retirer la tâche planifiée"
