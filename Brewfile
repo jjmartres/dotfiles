@@ -204,7 +204,6 @@ brew "kosmorro"                                 # A program to calculate your ep
 
 ## Cask Applications
 cask "cyberduck"                                # FTP, SFTP, WebDAV, S3, Azure, Google Drive and more
-cask "dbeaver-community"                        # Database management tool
 cask "gcloud-cli"                               # Command-line tool for Google Cloud Platform
 cask "ghostty"                                  # Modern and customizable terminal emulator
 cask "gitkraken"                                # Cross-platform Git GUI client
